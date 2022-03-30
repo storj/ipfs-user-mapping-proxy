@@ -46,7 +46,7 @@ func (p *Proxy) HandleAdd(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	err = db.Add(context.Background(), p.db, db.Content{
+	err = p.db.Add(context.Background(), db.Content{
 		User: user,
 		Hash: resp.Hash,
 		Name: resp.Name,

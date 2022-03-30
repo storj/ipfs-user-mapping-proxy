@@ -3,7 +3,6 @@ package proxy_test
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"mime/multipart"
@@ -11,23 +10,22 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/mock"
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/proxy"
 	"github.com/stretchr/testify/require"
 	"github.com/zeebo/assert"
-	"github.com/zeebo/errs"
 
 	"storj.io/common/testrand"
-	"storj.io/private/dbutil/pgutil"
+	"storj.io/private/dbutil"
+	"storj.io/private/dbutil/tempdb"
 )
 
 func TestAddHandler_MissingBasicAuth(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(ctx context.Context, proxy *httptest.Server, dbPool *pgxpool.Pool) {
+	runTest(t, mock.IPFSAddHandler, func(ctx context.Context, proxy *httptest.Server, db *db.DB) {
 		req, err := addRequest(proxy.URL, "", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -38,7 +36,7 @@ func TestAddHandler_MissingBasicAuth(t *testing.T) {
 }
 
 func TestAddHandler_InternalError(t *testing.T) {
-	runTest(t, mock.ErrorHandler, func(ctx context.Context, proxy *httptest.Server, dbPool *pgxpool.Pool) {
+	runTest(t, mock.ErrorHandler, func(ctx context.Context, proxy *httptest.Server, db *db.DB) {
 		req, err := addRequest(proxy.URL, "test", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -49,13 +47,13 @@ func TestAddHandler_InternalError(t *testing.T) {
 }
 
 func TestAddHandler(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(ctx context.Context, proxy *httptest.Server, dbPool *pgxpool.Pool) {
+	runTest(t, mock.IPFSAddHandler, func(ctx context.Context, proxy *httptest.Server, db *db.DB) {
 		// Upload a file
 		err := addFile(proxy.URL, "john", "first.jpg", 1024)
 		require.NoError(t, err)
 
 		// Check that the DB contains it
-		contents, err := db.List(ctx, dbPool)
+		contents, err := db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
 		assert.Equal(t, "john", contents[0].User)
@@ -67,7 +65,7 @@ func TestAddHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check that nothing changed in the DB
-		contents, err = db.List(ctx, dbPool)
+		contents, err = db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
 		assert.Equal(t, "john", contents[0].User)
@@ -79,7 +77,7 @@ func TestAddHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check that nothing changed in the DB, the file is still mapped to the first user
-		contents, err = db.List(ctx, dbPool)
+		contents, err = db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
 		assert.Equal(t, "john", contents[0].User)
@@ -91,7 +89,7 @@ func TestAddHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check that both users have one file each
-		contents, err = db.List(ctx, dbPool)
+		contents, err = db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 2)
 		assert.Equal(t, "john", contents[0].User)
@@ -106,7 +104,7 @@ func TestAddHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		// Check that both first user has two file, and the second user - one file
-		contents, err = db.List(ctx, dbPool)
+		contents, err = db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 3)
 		assert.Equal(t, "john", contents[0].User)
@@ -173,49 +171,59 @@ func addRequest(url, user, fileName string, fileSize int) (*http.Request, error)
 	return req, nil
 }
 
-func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(context.Context, *httptest.Server, *pgxpool.Pool)) {
+func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(context.Context, *httptest.Server, *db.DB)) {
 	ctx := context.Background()
-	ipfsServer := httptest.NewServer(http.HandlerFunc(mockHandler))
 
-	dbURI, err := initDB(ctx)
-	require.NoError(t, err)
+	for _, impl := range []dbutil.Implementation{dbutil.Postgres, dbutil.Cockroach} {
+		impl := impl
+		t.Run(strings.Title(impl.String()), func(t *testing.T) {
+			t.Parallel()
 
-	ipfsServerURL, err := url.Parse(ipfsServer.URL)
-	require.NoError(t, err)
+			ipfsServer := httptest.NewServer(http.HandlerFunc(mockHandler))
 
-	dbPool, err := pgxpool.Connect(ctx, dbURI)
-	require.NoError(t, err)
+			dbURI := dbURI(t, impl)
 
-	db.Init(ctx, dbPool)
-	require.NoError(t, err)
+			ipfsServerURL, err := url.Parse(ipfsServer.URL)
+			require.NoError(t, err)
 
-	proxy := proxy.New("", ipfsServerURL, dbPool)
-	tsProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proxy.HandleAdd(w, r)
-	}))
+			tempDB, err := tempdb.OpenUnique(ctx, dbURI, "ipfs-user-mapping-proxy")
+			require.NoError(t, err)
+			defer func() {
+				err := tempDB.Close()
+				require.NoError(t, err)
+			}()
 
-	f(ctx, tsProxy, dbPool)
+			db := db.Wrap(tempDB.DB)
+
+			err = db.MigrateToLatest(ctx)
+			require.NoError(t, err)
+
+			proxy := proxy.New("", ipfsServerURL, db)
+			tsProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				proxy.HandleAdd(w, r)
+			}))
+
+			f(ctx, tsProxy, db)
+		})
+	}
 }
 
-func initDB(ctx context.Context) (dbURI string, err error) {
-	dbURI, set := os.LookupEnv("STORJ_TEST_POSTGRES")
-	if !set {
-		return "", errors.New("skipping test suite; STORJ_TEST_POSTGRES is not set.")
+func dbURI(t *testing.T, impl dbutil.Implementation) (dbURI string) {
+	switch impl {
+	case dbutil.Postgres:
+		dbURI, set := os.LookupEnv("STORJ_TEST_POSTGRES")
+		if !set {
+			t.Skip("skipping test suite; STORJ_TEST_POSTGRES is not set.")
+		}
+		return dbURI
+	case dbutil.Cockroach:
+		dbURI, set := os.LookupEnv("STORJ_TEST_COCKROACH")
+		if !set {
+			t.Skip("skipping test suite; STORJ_TEST_COCKROACH is not set.")
+		}
+		return dbURI
+	default:
+		t.Errorf("unsupported database implementation %q", impl)
+		return ""
 	}
-
-	conn, err := pgx.Connect(ctx, dbURI)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		err = errs.Combine(err, conn.Close(ctx))
-	}()
-
-	schemaName := pgutil.CreateRandomTestingSchemaName(6)
-	_, err = conn.Exec(ctx, "CREATE SCHEMA "+pgutil.QuoteSchema(schemaName))
-	if err != nil {
-		return "", err
-	}
-
-	return pgutil.ConnstrWithSchema(dbURI, schemaName), nil
 }

@@ -6,7 +6,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
 )
 
@@ -15,12 +14,12 @@ import (
 type Proxy struct {
 	address string
 	proxy   *httputil.ReverseProxy
-	db      *pgxpool.Pool
+	db      *db.DB
 }
 
 // New creates a new Proxy to target. Proxy listens on the provided address
 // and stores the mappings to db.
-func New(address string, target *url.URL, db *pgxpool.Pool) *Proxy {
+func New(address string, target *url.URL, db *db.DB) *Proxy {
 	return &Proxy{
 		address: address,
 		proxy:   httputil.NewSingleHostReverseProxy(target),
@@ -30,11 +29,6 @@ func New(address string, target *url.URL, db *pgxpool.Pool) *Proxy {
 
 // Run starts the proxy.
 func (p *Proxy) Run(ctx context.Context) error {
-	err := db.Init(ctx, p.db)
-	if err != nil {
-		return err
-	}
-
 	http.HandleFunc("/api/v0/add", p.HandleAdd)
 
 	return http.ListenAndServe(p.address, nil)
