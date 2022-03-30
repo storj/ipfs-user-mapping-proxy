@@ -2,7 +2,7 @@
 
 This is a reverse proxy that runs in front of the IPFS node's HTTP API and intercepts the requests to the `/api/v0/add` endpoint.
 
-The proxy would detect the authenticated user name and will map it to the IPFS hash of the uploaded file. The mapping is stored in a local Postgres database.
+The proxy would detect the authenticated user name and will map it to the IPFS hash of the uploaded file. The mapping is stored in a local database.
 
 ## Usage
 
@@ -21,10 +21,11 @@ Flags:
 ```sql
 CREATE TABLE IF NOT EXISTS content (
 	id SERIAL PRIMARY KEY,
-	username TEXT NOT NULL,     # The authenticated user name.
-	hash TEXT UNIQUE NOT NULL,  # The IPFS hash of the uploaded content.
-	name TEXT NOT NULL,         # The name associated with the uploaded content, usually file name.
-	size BIGINT NOT NULL        # The size of the uploaded content.
+	username TEXT NOT NULL,                    # The authenticated user name.
+	created TIMESTAMP NOT NULL DEFAULT NOW(),  # The time when the content was uploaded.
+	hash TEXT UNIQUE NOT NULL,                 # The IPFS hash of the uploaded content.
+	name TEXT NOT NULL,                        # The name associated with the uploaded content, usually file name.
+	size BIGINT NOT NULL                       # The size of the uploaded content.
 )
 ```
 ## Run With Docker
