@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/url"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/proxy"
 	"github.com/spf13/cobra"
 
@@ -47,9 +48,14 @@ func cmdRun(cmd *cobra.Command, args []string) error {
 
 	ctx := context.Background()
 
-	db, err := pgxpool.Connect(ctx, config.DatabaseURL)
+	db, err := db.Open(ctx, config.DatabaseURL)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to connect to cache database: %s", err)
+	}
+
+	err = db.MigrateToLatest(ctx)
+	if err != nil {
+		log.Fatalf("failed to migrate database schema: %s", err)
 	}
 
 	return proxy.New(config.Address, target, db).Run(ctx)
