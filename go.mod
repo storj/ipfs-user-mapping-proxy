@@ -3,6 +3,7 @@ module github.com/kaloyan-raev/ipfs-user-mapping-proxy
 go 1.17
 
 require (
+	github.com/jackc/pgx/v4 v4.15.0
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
 	github.com/zeebo/errs v1.2.2
@@ -27,7 +28,6 @@ require (
 	github.com/jackc/pgproto3/v2 v2.2.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.10.0 // indirect
-	github.com/jackc/pgx/v4 v4.15.0 // indirect
 	github.com/jtolds/tracetagger/v2 v2.0.0-rc5 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
