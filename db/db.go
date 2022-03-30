@@ -5,10 +5,12 @@ import (
 	"strconv"
 	"time"
 
+	_ "github.com/jackc/pgx/v4/stdlib" // registers pgx as a tagsql driver.
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
 	"storj.io/private/dbutil"
+	_ "storj.io/private/dbutil/cockroachutil" // registers cockroach as a tagsql driver.
 	"storj.io/private/migrate"
 	"storj.io/private/tagsql"
 )

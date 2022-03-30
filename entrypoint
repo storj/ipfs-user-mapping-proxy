@@ -1,0 +1,2 @@
+#!/bin/sh
+exec ./ipfs-user-mapping-proxy run --address :${PROXY_PORT} --target $PROXY_TARGET --database-url $PROXY_DATABASE_URL
