@@ -11,10 +11,10 @@ RUN CGO_ENABLED=0 go build
 FROM alpine
 
 COPY --from=build /build/ipfs-user-mapping-proxy /app/
-COPY --from=build /build/entrypoint /app/
+COPY --from=build /build/entrypoint.sh /app/
 
 WORKDIR /app
 
-RUN chmod +x ./entrypoint
+RUN chmod +x ./entrypoint.sh
 
-ENTRYPOINT ["./entrypoint"]
+ENTRYPOINT ["./entrypoint.sh"]

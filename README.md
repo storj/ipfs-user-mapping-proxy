@@ -7,7 +7,7 @@ The proxy would detect the authenticated user name and will map it to the IPFS h
 ## Usage
 
 ```
-ipfs-proxy run --address <host:port> --target http://<host>:<port> --database-url <database_url>
+ipfs-proxy run --address <[host]:port> --target http://<host>:<port> --database-url <database_url>
 ```
 Flags:
 ```
@@ -35,9 +35,14 @@ docker run --rm -d \
     -e PROXY_PORT=7070 \
     -e PROXY_TARGET=http://localhost:5001 \
     -e PROXY_DATABASE_URL=<database_url> \
+	-e PROXY_DEBUG_ADDR=<[host]:port>
     kaloyanraev/ipfs-user-mapping-proxy
 ```
 
-`PROXY_PORT` must be set to the port number the proxy will listen for incoming requests.
+`PROXY_PORT` must be set to the port number the proxy will listen on for incoming requests.
 
 `PROXY_TARGET` must be set to the HTTP API URL of the IPFS node. The proxy will redirect all incoming requests to this address.
+
+`PROXY_DATABASE_URL` must be set to a Postgres or CockroachDB database URL.
+
+`PROXY_DEBUG_ADDR` can be set to a specific `[host]:port` address to listen on for the debug endpoints. If not set, the debug endpoints will listen on a random port on the localhost. 
