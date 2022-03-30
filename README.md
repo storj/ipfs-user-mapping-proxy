@@ -32,10 +32,10 @@ CREATE TABLE IF NOT EXISTS content (
 ```
 docker run --rm -d \
     --network host \
-	-e PROXY_PORT=7070 \
-	-e PROXY_TARGET=localhost:5001 \
-	-e PROXY_DATABASE_URL=<database_url> \
-	kaloyanraev/ipfs-user-mapping-proxy
+    -e PROXY_PORT=7070 \
+    -e PROXY_TARGET=localhost:5001 \
+    -e PROXY_DATABASE_URL=<database_url> \
+    kaloyanraev/ipfs-user-mapping-proxy
 ```
 
 `PROXY_PORT` must be set to the port number the proxy will listen for incoming requests.
