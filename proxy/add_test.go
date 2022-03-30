@@ -12,12 +12,13 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/mock"
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/proxy"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zeebo/assert"
 
 	"storj.io/common/testrand"
 	"storj.io/private/dbutil"
@@ -25,7 +26,7 @@ import (
 )
 
 func TestAddHandler_MissingBasicAuth(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(ctx context.Context, proxy *httptest.Server, db *db.DB) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx context.Context, proxy *httptest.Server, db *db.DB) {
 		req, err := addRequest(proxy.URL, "", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -36,7 +37,7 @@ func TestAddHandler_MissingBasicAuth(t *testing.T) {
 }
 
 func TestAddHandler_InternalError(t *testing.T) {
-	runTest(t, mock.ErrorHandler, func(ctx context.Context, proxy *httptest.Server, db *db.DB) {
+	runTest(t, mock.ErrorHandler, func(t *testing.T, ctx context.Context, proxy *httptest.Server, db *db.DB) {
 		req, err := addRequest(proxy.URL, "test", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -47,7 +48,7 @@ func TestAddHandler_InternalError(t *testing.T) {
 }
 
 func TestAddHandler(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(ctx context.Context, proxy *httptest.Server, db *db.DB) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx context.Context, proxy *httptest.Server, db *db.DB) {
 		// Upload a file
 		err := addFile(proxy.URL, "john", "first.jpg", 1024)
 		require.NoError(t, err)
@@ -56,9 +57,12 @@ func TestAddHandler(t *testing.T) {
 		contents, err := db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
-		assert.Equal(t, "john", contents[0].User)
-		assert.Equal(t, "first.jpg", contents[0].Name)
-		assert.Equal(t, 1024, contents[0].Size)
+
+		content1 := contents[0]
+		assert.Equal(t, "john", content1.User)
+		assert.Equal(t, "first.jpg", content1.Name)
+		assert.Equal(t, int64(1024), content1.Size)
+		assert.WithinDuration(t, time.Now(), content1.Created, 1*time.Minute)
 
 		// Upload the same file
 		err = addFile(proxy.URL, "john", "first.jpg", 1024)
@@ -68,9 +72,7 @@ func TestAddHandler(t *testing.T) {
 		contents, err = db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
-		assert.Equal(t, "john", contents[0].User)
-		assert.Equal(t, "first.jpg", contents[0].Name)
-		assert.Equal(t, 1024, contents[0].Size)
+		assert.Equal(t, content1, contents[0])
 
 		// Upload the same file, but by a different user
 		err = addFile(proxy.URL, "shawn", "first.jpg", 1024)
@@ -80,9 +82,7 @@ func TestAddHandler(t *testing.T) {
 		contents, err = db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
-		assert.Equal(t, "john", contents[0].User)
-		assert.Equal(t, "first.jpg", contents[0].Name)
-		assert.Equal(t, 1024, contents[0].Size)
+		assert.Equal(t, content1, contents[0])
 
 		// Upload a different file with the second user
 		err = addFile(proxy.URL, "shawn", "second.jpg", 1234)
@@ -94,10 +94,10 @@ func TestAddHandler(t *testing.T) {
 		require.Len(t, contents, 2)
 		assert.Equal(t, "john", contents[0].User)
 		assert.Equal(t, "first.jpg", contents[0].Name)
-		assert.Equal(t, 1024, contents[0].Size)
+		assert.Equal(t, int64(1024), contents[0].Size)
 		assert.Equal(t, "shawn", contents[1].User)
 		assert.Equal(t, "second.jpg", contents[1].Name)
-		assert.Equal(t, 1234, contents[1].Size)
+		assert.Equal(t, int64(1234), contents[1].Size)
 
 		// Upload a third file with the first user
 		err = addFile(proxy.URL, "john", "third.jpg", 12987)
@@ -109,13 +109,13 @@ func TestAddHandler(t *testing.T) {
 		require.Len(t, contents, 3)
 		assert.Equal(t, "john", contents[0].User)
 		assert.Equal(t, "first.jpg", contents[0].Name)
-		assert.Equal(t, 1024, contents[0].Size)
+		assert.Equal(t, int64(1024), contents[0].Size)
 		assert.Equal(t, "shawn", contents[1].User)
 		assert.Equal(t, "second.jpg", contents[1].Name)
-		assert.Equal(t, 1234, contents[1].Size)
+		assert.Equal(t, int64(1234), contents[1].Size)
 		assert.Equal(t, "john", contents[2].User)
 		assert.Equal(t, "third.jpg", contents[2].Name)
-		assert.Equal(t, 12987, contents[2].Size)
+		assert.Equal(t, int64(12987), contents[2].Size)
 	})
 }
 
@@ -171,7 +171,7 @@ func addRequest(url, user, fileName string, fileSize int) (*http.Request, error)
 	return req, nil
 }
 
-func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(context.Context, *httptest.Server, *db.DB)) {
+func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(*testing.T, context.Context, *httptest.Server, *db.DB)) {
 	ctx := context.Background()
 
 	for _, impl := range []dbutil.Implementation{dbutil.Postgres, dbutil.Cockroach} {
@@ -203,7 +203,7 @@ func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request),
 				proxy.HandleAdd(w, r)
 			}))
 
-			f(ctx, tsProxy, db)
+			f(t, ctx, tsProxy, db)
 		})
 	}
 }

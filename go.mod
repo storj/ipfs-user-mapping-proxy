@@ -3,11 +3,10 @@ module github.com/kaloyan-raev/ipfs-user-mapping-proxy
 go 1.17
 
 require (
-	github.com/jackc/pgx/v4 v4.15.0
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.7.0
-	github.com/zeebo/assert v1.3.0
 	github.com/zeebo/errs v1.2.2
+	go.uber.org/zap v1.14.1
 	storj.io/common v0.0.0-20220216094301-b27f3c9d69e1
 	storj.io/private v0.0.0-20220223100654-bd23f26f977d
 )
@@ -28,7 +27,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.2.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b // indirect
 	github.com/jackc/pgtype v1.10.0 // indirect
-	github.com/jackc/puddle v1.2.1 // indirect
+	github.com/jackc/pgx/v4 v4.15.0 // indirect
 	github.com/jtolds/tracetagger/v2 v2.0.0-rc5 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
@@ -47,7 +46,6 @@ require (
 	github.com/zeebo/structs v1.0.2 // indirect
 	go.uber.org/atomic v1.6.0 // indirect
 	go.uber.org/multierr v1.5.0 // indirect
-	go.uber.org/zap v1.14.1 // indirect
 	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838 // indirect
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect

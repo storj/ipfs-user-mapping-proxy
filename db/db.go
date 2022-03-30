@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"strconv"
+	"time"
 
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
@@ -24,6 +25,9 @@ type DB struct {
 type Content struct {
 	// User is the user who uploaded the content.
 	User string
+
+	// Created is when the content was uploaded.
+	Created time.Time
 
 	// Hash is the IPFS hash of the uploaded content.
 	Hash string
@@ -79,6 +83,7 @@ func (db *DB) Migration() *migrate.Migration {
 					CREATE TABLE IF NOT EXISTS content (
 						id SERIAL PRIMARY KEY,
 						username TEXT NOT NULL,
+						created TIMESTAMP NOT NULL DEFAULT NOW(),
 						hash TEXT UNIQUE NOT NULL,
 						name TEXT NOT NULL,
 						size BIGINT NOT NULL
@@ -90,6 +95,8 @@ func (db *DB) Migration() *migrate.Migration {
 }
 
 // Add adds a content record to the database.
+//
+// The content's created time is ignored as it is automatically set by the database.
 func (db *DB) Add(ctx context.Context, content Content) error {
 	_, err := db.Exec(ctx, `
 		INSERT INTO content (username, hash, name, size)
@@ -102,7 +109,7 @@ func (db *DB) Add(ctx context.Context, content Content) error {
 // List returns all content records from the database.
 func (db *DB) List(ctx context.Context) ([]Content, error) {
 	rows, err := db.Query(ctx, `
-		SELECT username, hash, name, size
+		SELECT username, created, hash, name, size
 		FROM content
 	`)
 	if err != nil {
@@ -113,7 +120,7 @@ func (db *DB) List(ctx context.Context) ([]Content, error) {
 	var result []Content
 	for rows.Next() {
 		var content Content
-		err := rows.Scan(&content.User, &content.Hash, &content.Name, &content.Size)
+		err := rows.Scan(&content.User, &content.Created, &content.Hash, &content.Name, &content.Size)
 		if err != nil {
 			return nil, Error.Wrap(err)
 		}
