@@ -25,6 +25,7 @@ func (p *Proxy) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	user, _, ok := r.BasicAuth()
 	if !ok {
 		http.Error(w, "no basic auth", http.StatusUnauthorized)
+		return
 	}
 
 	wrapper := NewResponseWriterWrapper(w)
@@ -39,11 +40,13 @@ func (p *Proxy) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	err := json.Unmarshal(wrapper.Body, &resp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	size, err := strconv.ParseInt(resp.Size, 10, 64)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	err = p.db.Add(context.Background(), db.Content{
@@ -54,5 +57,6 @@ func (p *Proxy) HandleAdd(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
