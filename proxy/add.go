@@ -3,10 +3,12 @@ package proxy
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
+	"github.com/spacemonkeygo/monkit/v3"
 )
 
 // AddResponse is the JSON object returned to Add requests.
@@ -22,31 +24,40 @@ type AddResponse struct {
 // It retrieves the authenticated user from the requests and maps it to the
 // uploaded content. The mapping is stored in the database.
 func (p *Proxy) HandleAdd(w http.ResponseWriter, r *http.Request) {
+	code, err := p.handleAdd(r.Context(), w, r)
+
+	mon.Counter("add_handler_response_codes", monkit.NewSeriesTag("code", strconv.Itoa(code))).Inc(1)
+
+	if err != nil {
+		http.Error(w, err.Error(), code)
+		return
+	}
+}
+
+func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Request) (code int, err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	user, _, ok := r.BasicAuth()
 	if !ok {
-		http.Error(w, "no basic auth", http.StatusUnauthorized)
-		return
+		return http.StatusUnauthorized, errors.New("no basic auth")
 	}
 
 	wrapper := NewResponseWriterWrapper(w)
 	p.proxy.ServeHTTP(wrapper, r)
 
 	if wrapper.StatusCode != http.StatusOK {
-		// add logging and montoring
-		return
+		return wrapper.StatusCode, nil
 	}
 
 	var resp AddResponse
-	err := json.Unmarshal(wrapper.Body, &resp)
+	err = json.Unmarshal(wrapper.Body, &resp)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, err
 	}
 
 	size, err := strconv.ParseInt(resp.Size, 10, 64)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, err
 	}
 
 	err = p.db.Add(context.Background(), db.Content{
@@ -56,7 +67,8 @@ func (p *Proxy) HandleAdd(w http.ResponseWriter, r *http.Request) {
 		Size: size,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return http.StatusInternalServerError, err
 	}
+
+	return wrapper.StatusCode, nil
 }

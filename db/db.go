@@ -6,6 +6,7 @@ import (
 	"time"
 
 	_ "github.com/jackc/pgx/v4/stdlib" // registers pgx as a tagsql driver.
+	"github.com/spacemonkeygo/monkit/v3"
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
@@ -14,6 +15,8 @@ import (
 	"storj.io/private/migrate"
 	"storj.io/private/tagsql"
 )
+
+var mon = monkit.Package()
 
 // Error is the error class for datastore database.
 var Error = errs.Class("db")
@@ -42,7 +45,9 @@ type Content struct {
 }
 
 // Open creates instance of the database.
-func Open(ctx context.Context, databaseURL string) (*DB, error) {
+func Open(ctx context.Context, databaseURL string) (db *DB, err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	_, _, impl, err := dbutil.SplitConnStr(databaseURL)
 	if err != nil {
 		return nil, Error.Wrap(err)
@@ -58,17 +63,20 @@ func Open(ctx context.Context, databaseURL string) (*DB, error) {
 		return nil, Error.New("unsupported implementation: %s", driverName)
 	}
 
-	db, err := tagsql.Open(ctx, driverName, databaseURL)
+	tagdb, err := tagsql.Open(ctx, driverName, databaseURL)
 	if err != nil {
 		return nil, Error.Wrap(err)
 	}
 
-	return Wrap(db), nil
+	return Wrap(tagdb), nil
 }
 
 // MigrateToLatest migrates pindb to the latest version.
-func (db *DB) MigrateToLatest(ctx context.Context) error {
-	err := db.Migration().Run(ctx, zap.NewExample())
+func (db *DB) MigrateToLatest(ctx context.Context) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	err = db.Migration().Run(ctx, zap.NewExample())
+
 	return Error.Wrap(err)
 }
 
@@ -99,17 +107,22 @@ func (db *DB) Migration() *migrate.Migration {
 // Add adds a content record to the database.
 //
 // The content's created time is ignored as it is automatically set by the database.
-func (db *DB) Add(ctx context.Context, content Content) error {
-	_, err := db.Exec(ctx, `
+func (db *DB) Add(ctx context.Context, content Content) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	_, err = db.Exec(ctx, `
 		INSERT INTO content (username, hash, name, size)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT(hash) DO NOTHING
 	`, content.User, content.Hash, content.Name, content.Size)
+
 	return Error.Wrap(err)
 }
 
 // List returns all content records from the database.
-func (db *DB) List(ctx context.Context) ([]Content, error) {
+func (db *DB) List(ctx context.Context) (result []Content, err error) {
+	defer mon.Task()(&ctx)(&err)
+
 	rows, err := db.Query(ctx, `
 		SELECT username, created, hash, name, size
 		FROM content
@@ -119,7 +132,6 @@ func (db *DB) List(ctx context.Context) ([]Content, error) {
 	}
 	defer rows.Close()
 
-	var result []Content
 	for rows.Next() {
 		var content Content
 		err := rows.Scan(&content.User, &content.Created, &content.Hash, &content.Name, &content.Size)
