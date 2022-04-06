@@ -33,6 +33,11 @@ func TestAddHandler_MissingBasicAuth(t *testing.T) {
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+
+		// Check that DB is still empty
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Empty(t, contents)
 	})
 }
 
@@ -44,6 +49,11 @@ func TestAddHandler_InternalError(t *testing.T) {
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+
+		// Check that DB is still empty
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Empty(t, contents)
 	})
 }
 
