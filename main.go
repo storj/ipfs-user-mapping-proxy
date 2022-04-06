@@ -5,10 +5,10 @@ import (
 	"log"
 	"net/url"
 
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/proxy"
 	"github.com/spf13/cobra"
 
+	"storj.io/ipfs-user-mapping-proxy/db"
+	"storj.io/ipfs-user-mapping-proxy/proxy"
 	"storj.io/private/process"
 )
 

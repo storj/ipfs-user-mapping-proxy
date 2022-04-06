@@ -37,7 +37,7 @@ docker run --rm -d \
     -e PROXY_TARGET=http://localhost:5001 \
     -e PROXY_DATABASE_URL=<database_url> \
     -e PROXY_DEBUG_ADDR=<[host]:port> \
-    kaloyanraev/ipfs-user-mapping-proxy:<tag>
+    storjlabs/ipfs-user-mapping-proxy:<tag>
 ```
 
 `PROXY_PORT` must be set to the port number the proxy will listen on for incoming requests.

@@ -1,4 +1,4 @@
-module github.com/kaloyan-raev/ipfs-user-mapping-proxy
+module storj.io/ipfs-user-mapping-proxy
 
 go 1.17
 

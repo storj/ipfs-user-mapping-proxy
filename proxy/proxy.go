@@ -6,8 +6,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
 	"github.com/spacemonkeygo/monkit/v3"
+
+	"storj.io/ipfs-user-mapping-proxy/db"
 )
 
 var mon = monkit.Package()
