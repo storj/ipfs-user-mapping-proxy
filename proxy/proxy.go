@@ -6,7 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
+	"storj.io/ipfs-user-mapping-proxy/db"
 )
 
 // Proxy is a reverse proxy to the IPFS node's HTTP API that

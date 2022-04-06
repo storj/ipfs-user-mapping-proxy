@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/proxy"
+	"storj.io/ipfs-user-mapping-proxy/proxy"
 )
 
 // IPFSAddHandler is an HTTP handler that mocks the /api/v0/add enpoint of an IPFS Node.

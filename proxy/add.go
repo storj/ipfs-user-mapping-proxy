@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
+	"storj.io/ipfs-user-mapping-proxy/db"
 )
 
 // AddResponse is the JSON object returned to Add requests.

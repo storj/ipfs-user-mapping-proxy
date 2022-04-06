@@ -14,13 +14,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/db"
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/mock"
-	"github.com/kaloyan-raev/ipfs-user-mapping-proxy/proxy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"storj.io/common/testrand"
+	"storj.io/ipfs-user-mapping-proxy/db"
+	"storj.io/ipfs-user-mapping-proxy/mock"
+	"storj.io/ipfs-user-mapping-proxy/proxy"
 	"storj.io/private/dbutil"
 	"storj.io/private/dbutil/tempdb"
 )
