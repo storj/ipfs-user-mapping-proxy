@@ -89,7 +89,7 @@ func TestAddHandler(t *testing.T) {
 		err = addFile(proxy.URL, "shawn", "first.jpg", 1024)
 		require.NoError(t, err)
 
-		// Check that both users has the same file
+		// Check that both users have the same file
 		contents, err = db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 2)
