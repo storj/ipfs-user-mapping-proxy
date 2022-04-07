@@ -131,7 +131,7 @@ func (db *DB) Add(ctx context.Context, content Content) (err error) {
 	result, err := db.Exec(ctx, `
 		INSERT INTO content (username, hash, name, size)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (username, hash) DO NOTHING
+		ON CONFLICT (hash) DO NOTHING
 	`, content.User, content.Hash, content.Name, content.Size)
 	if err != nil {
 		return Error.Wrap(err)
