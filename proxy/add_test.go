@@ -89,46 +89,51 @@ func TestAddHandler(t *testing.T) {
 		err = addFile(proxy.URL, "shawn", "first.jpg", 1024)
 		require.NoError(t, err)
 
-		// Check that nothing changed in the DB, the file is still mapped to the first user
+		// Check that both users have the same file
 		contents, err = db.List(ctx)
 		require.NoError(t, err)
-		require.Len(t, contents, 1)
+		require.Len(t, contents, 2)
 		assert.Equal(t, content1, contents[0])
+		assert.Equal(t, "shawn", contents[1].User)
+		assert.Equal(t, content1.Name, contents[1].Name)
+		assert.Equal(t, content1.Size, contents[1].Size)
 
 		// Upload a different file with the second user
 		err = addFile(proxy.URL, "shawn", "second.jpg", 1234)
 		require.NoError(t, err)
 
-		// Check that both users have one file each
+		// Check that the first user has one file, and the second - two files
 		contents, err = db.List(ctx)
 		sortByCreated(contents)
 		require.NoError(t, err)
-		require.Len(t, contents, 2)
-		assert.Equal(t, "john", contents[0].User)
-		assert.Equal(t, "first.jpg", contents[0].Name)
-		assert.Equal(t, int64(1024), contents[0].Size)
+		require.Len(t, contents, 3)
+		assert.Equal(t, content1, contents[0])
 		assert.Equal(t, "shawn", contents[1].User)
-		assert.Equal(t, "second.jpg", contents[1].Name)
-		assert.Equal(t, int64(1234), contents[1].Size)
+		assert.Equal(t, content1.Name, contents[1].Name)
+		assert.Equal(t, content1.Size, contents[1].Size)
+		assert.Equal(t, "shawn", contents[2].User)
+		assert.Equal(t, "second.jpg", contents[2].Name)
+		assert.Equal(t, int64(1234), contents[2].Size)
 
 		// Upload a third file with the first user
 		err = addFile(proxy.URL, "john", "third.jpg", 12987)
 		require.NoError(t, err)
 
-		// Check that both first user has two file, and the second user - one file
+		// Check that both users have two files
 		contents, err = db.List(ctx)
 		sortByCreated(contents)
 		require.NoError(t, err)
-		require.Len(t, contents, 3)
-		assert.Equal(t, "john", contents[0].User)
-		assert.Equal(t, "first.jpg", contents[0].Name)
-		assert.Equal(t, int64(1024), contents[0].Size)
+		require.Len(t, contents, 4)
+		assert.Equal(t, content1, contents[0])
 		assert.Equal(t, "shawn", contents[1].User)
-		assert.Equal(t, "second.jpg", contents[1].Name)
-		assert.Equal(t, int64(1234), contents[1].Size)
-		assert.Equal(t, "john", contents[2].User)
-		assert.Equal(t, "third.jpg", contents[2].Name)
-		assert.Equal(t, int64(12987), contents[2].Size)
+		assert.Equal(t, content1.Name, contents[1].Name)
+		assert.Equal(t, content1.Size, contents[1].Size)
+		assert.Equal(t, "shawn", contents[2].User)
+		assert.Equal(t, "second.jpg", contents[2].Name)
+		assert.Equal(t, int64(1234), contents[2].Size)
+		assert.Equal(t, "john", contents[3].User)
+		assert.Equal(t, "third.jpg", contents[3].Name)
+		assert.Equal(t, int64(12987), contents[3].Size)
 	})
 }
 
