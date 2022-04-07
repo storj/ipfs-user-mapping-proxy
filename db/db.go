@@ -87,7 +87,7 @@ func (db *DB) Migration() *migrate.Migration {
 		Steps: []*migrate.Step{
 			{
 				DB:          &db.DB,
-				Description: "Initial setup",
+				Description: "Initial setup.",
 				Version:     0,
 				Action: migrate.SQL{`
 					CREATE TABLE IF NOT EXISTS content (
@@ -100,6 +100,24 @@ func (db *DB) Migration() *migrate.Migration {
 					)
 				`},
 			},
+			{
+				DB:          &db.DB,
+				Description: "Migrate to (username, hash) primary key.",
+				Version:     1,
+				Action: migrate.SQL{
+					`ALTER TABLE content DROP CONSTRAINT IF EXISTS content_pkey`,
+					`ALTER TABLE content DROP CONSTRAINT IF EXISTS "primary"`,
+					`ALTER TABLE content ADD PRIMARY KEY (username, hash)`,
+				},
+			},
+			{
+				DB:          &db.DB,
+				Description: "Drop the obsolete id column.",
+				Version:     2,
+				Action: migrate.SQL{
+					`ALTER TABLE content DROP COLUMN id`,
+				},
+			},
 		},
 	}
 }
@@ -110,13 +128,23 @@ func (db *DB) Migration() *migrate.Migration {
 func (db *DB) Add(ctx context.Context, content Content) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	_, err = db.Exec(ctx, `
+	result, err := db.Exec(ctx, `
 		INSERT INTO content (username, hash, name, size)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT(hash) DO NOTHING
+		ON CONFLICT (hash) DO NOTHING
 	`, content.User, content.Hash, content.Name, content.Size)
+	if err != nil {
+		return Error.Wrap(err)
+	}
 
-	return Error.Wrap(err)
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return Error.Wrap(err)
+	}
+
+	mon.Counter("add_db_affected_rows", monkit.NewSeriesTag("rows", strconv.FormatInt(affected, 10))).Inc(1)
+
+	return nil
 }
 
 // List returns all content records from the database.

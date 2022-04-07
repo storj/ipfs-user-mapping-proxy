@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -100,6 +101,7 @@ func TestAddHandler(t *testing.T) {
 
 		// Check that both users have one file each
 		contents, err = db.List(ctx)
+		sortByCreated(contents)
 		require.NoError(t, err)
 		require.Len(t, contents, 2)
 		assert.Equal(t, "john", contents[0].User)
@@ -115,6 +117,7 @@ func TestAddHandler(t *testing.T) {
 
 		// Check that both first user has two file, and the second user - one file
 		contents, err = db.List(ctx)
+		sortByCreated(contents)
 		require.NoError(t, err)
 		require.Len(t, contents, 3)
 		assert.Equal(t, "john", contents[0].User)
@@ -179,6 +182,12 @@ func addRequest(url, user, fileName string, fileSize int) (*http.Request, error)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	return req, nil
+}
+
+func sortByCreated(contents []db.Content) {
+	sort.Slice(contents, func(i, j int) bool {
+		return contents[i].Created.Before(contents[j].Created)
+	})
 }
 
 func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(*testing.T, context.Context, *httptest.Server, *db.DB)) {
