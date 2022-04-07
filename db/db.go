@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"storj.io/private/dbutil"
-	"storj.io/private/dbutil/cockroachutil" // registers cockroach as a tagsql driver.
+	_ "storj.io/private/dbutil/cockroachutil" // registers cockroach as a tagsql driver.
 	"storj.io/private/migrate"
 	"storj.io/private/tagsql"
 )
@@ -117,30 +117,6 @@ func (db *DB) Migration() *migrate.Migration {
 				Action: migrate.SQL{
 					`ALTER TABLE content DROP COLUMN id`,
 				},
-			},
-			{
-				DB:          &db.DB,
-				Description: "Drop the obsolete unique constraint on the hash column.",
-				Version:     3,
-				Action: migrate.Func(func(ctx context.Context, log *zap.Logger, db tagsql.DB, tx tagsql.Tx) error {
-					if _, ok := db.Driver().(*cockroachutil.Driver); ok {
-						_, err := db.Exec(ctx,
-							`DROP INDEX content_hash_key CASCADE`,
-						)
-						if err != nil {
-							return Error.Wrap(err)
-						}
-						return nil
-					}
-
-					_, err := db.Exec(ctx,
-						`ALTER TABLE content DROP CONSTRAINT content_hash_key`,
-					)
-					if err != nil {
-						return Error.Wrap(err)
-					}
-					return nil
-				}),
 			},
 		},
 	}
