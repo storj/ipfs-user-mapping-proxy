@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"storj.io/private/dbutil"
-	_ "storj.io/private/dbutil/cockroachutil" // registers cockroach as a tagsql driver.
+	"storj.io/private/dbutil/cockroachutil" // registers cockroach as a tagsql driver.
 	"storj.io/private/migrate"
 	"storj.io/private/tagsql"
 )
@@ -87,7 +87,7 @@ func (db *DB) Migration() *migrate.Migration {
 		Steps: []*migrate.Step{
 			{
 				DB:          &db.DB,
-				Description: "Initial setup",
+				Description: "Initial setup.",
 				Version:     0,
 				Action: migrate.SQL{`
 					CREATE TABLE IF NOT EXISTS content (
@@ -102,14 +102,45 @@ func (db *DB) Migration() *migrate.Migration {
 			},
 			{
 				DB:          &db.DB,
-				Description: "Migrate to (username, hash) primary key",
+				Description: "Migrate to (username, hash) primary key.",
 				Version:     1,
-				Action: migrate.SQL{`
-					ALTER TABLE content DROP CONSTRAINT content_hash_key;
-					ALTER TABLE content DROP CONSTRAINT content_pkey;
-					ALTER TABLE content ADD PRIMARY KEY (username, hash);
-					ALTER TABLE content DROP COLUMN id;
-				`},
+				Action: migrate.SQL{
+					`ALTER TABLE content DROP CONSTRAINT IF EXISTS content_pkey`,
+					`ALTER TABLE content DROP CONSTRAINT IF EXISTS "primary"`,
+					`ALTER TABLE content ADD PRIMARY KEY (username, hash)`,
+				},
+			},
+			{
+				DB:          &db.DB,
+				Description: "Drop the obsolete id column.",
+				Version:     2,
+				Action: migrate.SQL{
+					`ALTER TABLE content DROP COLUMN id`,
+				},
+			},
+			{
+				DB:          &db.DB,
+				Description: "Drop the obsolete unique constraint on the hash column.",
+				Version:     3,
+				Action: migrate.Func(func(ctx context.Context, log *zap.Logger, db tagsql.DB, tx tagsql.Tx) error {
+					if _, ok := db.Driver().(*cockroachutil.Driver); ok {
+						_, err := db.Exec(ctx,
+							`DROP INDEX content_hash_key CASCADE`,
+						)
+						if err != nil {
+							return Error.Wrap(err)
+						}
+						return nil
+					}
+
+					_, err := db.Exec(ctx,
+						`ALTER TABLE content DROP CONSTRAINT content_hash_key`,
+					)
+					if err != nil {
+						return Error.Wrap(err)
+					}
+					return nil
+				}),
 			},
 		},
 	}
@@ -124,7 +155,7 @@ func (db *DB) Add(ctx context.Context, content Content) (err error) {
 	result, err := db.Exec(ctx, `
 		INSERT INTO content (username, hash, name, size)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT ON CONSTRAINT content_pkey DO NOTHING
+		ON CONFLICT (username, hash) DO NOTHING
 	`, content.User, content.Hash, content.Name, content.Size)
 	if err != nil {
 		return Error.Wrap(err)
