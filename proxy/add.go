@@ -61,7 +61,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 		return http.StatusInternalServerError, err
 	}
 
-	err = p.db.Add(context.Background(), db.Content{
+	err = p.db.Add(ctx, db.Content{
 		User: user,
 		Hash: resp.Hash,
 		Name: resp.Name,
