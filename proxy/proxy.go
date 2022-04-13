@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/spacemonkeygo/monkit/v3"
+	"go.uber.org/zap"
 
 	"storj.io/ipfs-user-mapping-proxy/db"
 )
@@ -16,18 +17,26 @@ var mon = monkit.Package()
 // Proxy is a reverse proxy to the IPFS node's HTTP API that
 // maps uploaded content to the authenticated user.
 type Proxy struct {
+	log     *zap.Logger
+	db      *db.DB
 	address string
 	proxy   *httputil.ReverseProxy
-	db      *db.DB
 }
 
 // New creates a new Proxy to target. Proxy listens on the provided address
 // and stores the mappings to db.
-func New(address string, target *url.URL, db *db.DB) *Proxy {
+func New(log *zap.Logger, db *db.DB, address string, target *url.URL) *Proxy {
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		log.Error("Proxy error", zap.Error(err))
+		rw.WriteHeader(http.StatusBadGateway)
+	}
+
 	return &Proxy{
-		address: address,
-		proxy:   httputil.NewSingleHostReverseProxy(target),
+		log:     log,
 		db:      db,
+		address: address,
+		proxy:   proxy,
 	}
 }
 

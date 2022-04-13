@@ -17,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"storj.io/common/testrand"
 	"storj.io/ipfs-user-mapping-proxy/db"
@@ -217,12 +218,15 @@ func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request),
 				require.NoError(t, err)
 			}()
 
-			db := db.Wrap(tempDB.DB)
+			log, err := zap.NewDevelopment()
+			require.NoError(t, err)
+
+			db := db.Wrap(tempDB.DB).WithLog(log)
 
 			err = db.MigrateToLatest(ctx)
 			require.NoError(t, err)
 
-			proxy := proxy.New("", ipfsServerURL, db)
+			proxy := proxy.New(log, db, "", ipfsServerURL)
 			tsProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				proxy.HandleAdd(w, r)
 			}))

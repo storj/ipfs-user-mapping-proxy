@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/spacemonkeygo/monkit/v3"
+	"go.uber.org/zap"
 
 	"storj.io/ipfs-user-mapping-proxy/db"
 )
@@ -25,40 +26,48 @@ type AddResponse struct {
 // It retrieves the authenticated user from the requests and maps it to the
 // uploaded content. The mapping is stored in the database.
 func (p *Proxy) HandleAdd(w http.ResponseWriter, r *http.Request) {
-	code, err := p.handleAdd(r.Context(), w, r)
-
-	mon.Counter("add_handler_response_codes", monkit.NewSeriesTag("code", strconv.Itoa(code))).Inc(1)
-
-	if err != nil {
-		http.Error(w, err.Error(), code)
-		return
-	}
+	_ = p.handleAdd(r.Context(), w, r)
 }
 
-func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Request) (code int, err error) {
+func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Request) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
 	user, _, ok := r.BasicAuth()
 	if !ok {
-		return http.StatusUnauthorized, errors.New("no basic auth")
+		mon.Counter("add_handler_response_codes", monkit.NewSeriesTag("code", strconv.Itoa(http.StatusUnauthorized))).Inc(1)
+		p.log.Error("No basic auth in request")
+		err = errors.New("no basic auth")
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return err
 	}
 
 	wrapper := NewResponseWriterWrapper(w)
 	p.proxy.ServeHTTP(wrapper, r)
 
-	if wrapper.StatusCode != http.StatusOK {
-		return wrapper.StatusCode, nil
+	code := wrapper.StatusCode
+	mon.Counter("add_handler_response_codes", monkit.NewSeriesTag("code", strconv.Itoa(code))).Inc(1)
+
+	if code != http.StatusOK {
+		if code > 400 && code != http.StatusBadGateway {
+			// BadGateway is logged by the proxy error handler
+			p.log.Error("Proxy error", zap.Int("Code", code), zap.ByteString("Body", wrapper.Body))
+		}
+		return err
 	}
 
 	var resp AddResponse
 	err = json.Unmarshal(wrapper.Body, &resp)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		mon.Counter("error_unmarshal_response").Inc(1)
+		p.log.Error("JSON response unmarshal error", zap.ByteString("Body", wrapper.Body), zap.Error(err))
+		return err
 	}
 
 	size, err := strconv.ParseInt(resp.Size, 10, 64)
 	if err != nil {
-		return http.StatusInternalServerError, err
+		mon.Counter("error_parse_size").Inc(1)
+		p.log.Error("Size parse error", zap.String("Size", resp.Size), zap.Error(err))
+		return err
 	}
 
 	err = p.db.Add(ctx, db.Content{
@@ -68,8 +77,15 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 		Size: size,
 	})
 	if err != nil {
-		return http.StatusInternalServerError, err
+		mon.Counter("error_db_add").Inc(1)
+		p.log.Error("Error adding content to database",
+			zap.String("User", user),
+			zap.String("Hash", resp.Hash),
+			zap.String("Name", resp.Name),
+			zap.Int64("Size", size),
+			zap.Error(err))
+		return err
 	}
 
-	return wrapper.StatusCode, nil
+	return nil
 }
