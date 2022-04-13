@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/url"
 
@@ -46,7 +45,7 @@ func cmdRun(cmd *cobra.Command, args []string) error {
 		panic(err)
 	}
 
-	ctx := context.Background()
+	ctx := cmd.Context()
 
 	db, err := db.Open(ctx, config.DatabaseURL)
 	if err != nil {

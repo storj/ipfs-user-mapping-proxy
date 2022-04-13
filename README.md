@@ -48,4 +48,4 @@ Docker images are publushed to https://hub.docker.com/r/storjlabs/ipfs-user-mapp
 
 `PROXY_DATABASE_URL` must be set to a Postgres or CockroachDB database URL.
 
-`PROXY_DEBUG_ADDR` can be set to a specific `[host]:port` address to listen on for the debug endpoints. If not set, the debug endpoints will listen on a random port on the localhost. 
+`PROXY_DEBUG_ADDR` can be set to a specific `[host]:port` address to listen on for the debug endpoints. If not set, the debug endpoints will listen on a random port on the localhost.
