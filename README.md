@@ -42,7 +42,7 @@ docker run --rm -d \
     storjlabs/ipfs-user-mapping-proxy:<tag>
 ```
 
-Docker images are publushed to https://hub.docker.com/r/storjlabs/ipfs-user-mapping-proxy.
+Docker images are published to https://hub.docker.com/r/storjlabs/ipfs-user-mapping-proxy.
 
 `PROXY_PORT` must be set to the port number the proxy will listen on for incoming requests.
 
