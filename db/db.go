@@ -24,6 +24,7 @@ var Error = errs.Class("db")
 // DB is the database for mapping pinned IPFS content to users.
 type DB struct {
 	tagsql.DB
+	log *zap.Logger
 }
 
 // Content represents a content record in the database.
@@ -75,7 +76,7 @@ func Open(ctx context.Context, databaseURL string) (db *DB, err error) {
 func (db *DB) MigrateToLatest(ctx context.Context) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	err = db.Migration().Run(ctx, zap.NewExample())
+	err = db.Migration().Run(ctx, db.log)
 
 	return Error.Wrap(err)
 }
@@ -199,6 +200,11 @@ func (db *DB) List(ctx context.Context) (result []Content, err error) {
 // Wrap turns a tagsql.DB into a DB struct.
 func Wrap(db tagsql.DB) *DB {
 	return &DB{DB: postgresRebind{DB: db}}
+}
+
+func (db *DB) WithLog(log *zap.Logger) *DB {
+	db.log = log
+	return db
 }
 
 // This is needed for migrate to work.

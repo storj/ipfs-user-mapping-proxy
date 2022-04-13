@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/url"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 
 	"storj.io/ipfs-user-mapping-proxy/db"
 	"storj.io/ipfs-user-mapping-proxy/proxy"
@@ -40,22 +42,38 @@ func main() {
 }
 
 func cmdRun(cmd *cobra.Command, args []string) error {
-	target, err := url.Parse(config.Target)
+	ctx := cmd.Context()
+
+	logger, _, err := process.NewLogger(rootCmd.Use)
 	if err != nil {
-		panic(err)
+		log.Fatalf("failed to initialize logger: %v", err)
+		return fmt.Errorf("failed to initialize logger: %v", err)
 	}
 
-	ctx := cmd.Context()
+	target, err := url.Parse(config.Target)
+	if err != nil {
+		logger.Fatal("Failed to parse target url", zap.Error(err))
+		return fmt.Errorf("failed to parse target url: %v", err)
+	}
 
 	db, err := db.Open(ctx, config.DatabaseURL)
 	if err != nil {
-		log.Fatalf("failed to connect to cache database: %s", err)
+		logger.Fatal("Failed to connect to database", zap.Error(err))
+		return fmt.Errorf("failed to connect to database: %v", err)
 	}
+
+	db = db.WithLog(logger)
 
 	err = db.MigrateToLatest(ctx)
 	if err != nil {
-		log.Fatalf("failed to migrate database schema: %s", err)
+		logger.Fatal("Failed to migrate database schema", zap.Error(err))
+		return fmt.Errorf("failed to migrate database schema: %v", err)
 	}
 
-	return proxy.New(config.Address, target, db).Run(ctx)
+	err = proxy.New(logger, db, config.Address, target).Run(ctx)
+	if err != nil {
+		logger.Error("Error running proxy", zap.Error(err))
+	}
+
+	return err
 }

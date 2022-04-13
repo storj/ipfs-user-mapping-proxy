@@ -36,6 +36,8 @@ docker run --rm -d \
     -e PROXY_PORT=7070 \
     -e PROXY_TARGET=http://localhost:5001 \
     -e PROXY_DATABASE_URL=<database_url> \
+    -e PROXY_LOG_FILE=/app/log/output.log \
+    -e PROXY_LOG_LEVEL=info \
     -e PROXY_DEBUG_ADDR=<[host]:port> \
     storjlabs/ipfs-user-mapping-proxy:<tag>
 ```
@@ -47,5 +49,9 @@ Docker images are publushed to https://hub.docker.com/r/storjlabs/ipfs-user-mapp
 `PROXY_TARGET` must be set to the HTTP API URL of the IPFS node. The proxy will redirect all incoming requests to this address.
 
 `PROXY_DATABASE_URL` must be set to a Postgres or CockroachDB database URL.
+
+If `PROXY_LOG_FILE` is not set, the logs are printed to the standard error.
+
+`PROXY_LOG_LEVEL` sets the log level. The default level is INFO. 
 
 `PROXY_DEBUG_ADDR` can be set to a specific `[host]:port` address to listen on for the debug endpoints. If not set, the debug endpoints will listen on a random port on the localhost.
