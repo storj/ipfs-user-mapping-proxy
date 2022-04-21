@@ -2,7 +2,6 @@ package proxy_test
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io/ioutil"
 	"mime/multipart"
@@ -19,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
 	"storj.io/ipfs-user-mapping-proxy/db"
 	"storj.io/ipfs-user-mapping-proxy/mock"
@@ -28,7 +28,7 @@ import (
 )
 
 func TestAddHandler_MissingBasicAuth(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx context.Context, proxy *httptest.Server, db *db.DB) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
 		req, err := addRequest(proxy.URL, "", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -44,7 +44,7 @@ func TestAddHandler_MissingBasicAuth(t *testing.T) {
 }
 
 func TestAddHandler_InternalError(t *testing.T) {
-	runTest(t, mock.ErrorHandler, func(t *testing.T, ctx context.Context, proxy *httptest.Server, db *db.DB) {
+	runTest(t, mock.ErrorHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
 		req, err := addRequest(proxy.URL, "test", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -60,7 +60,7 @@ func TestAddHandler_InternalError(t *testing.T) {
 }
 
 func TestAddHandler(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx context.Context, proxy *httptest.Server, db *db.DB) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
 		// Upload a file
 		err := addFile(proxy.URL, "john", "first.jpg", 1024)
 		require.NoError(t, err)
@@ -196,13 +196,13 @@ func sortByCreated(contents []db.Content) {
 	})
 }
 
-func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(*testing.T, context.Context, *httptest.Server, *db.DB)) {
-	ctx := context.Background()
-
+func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(*testing.T, *testcontext.Context, *httptest.Server, *db.DB)) {
 	for _, impl := range []dbutil.Implementation{dbutil.Postgres, dbutil.Cockroach} {
 		impl := impl
 		t.Run(strings.Title(impl.String()), func(t *testing.T) {
 			t.Parallel()
+
+			ctx := testcontext.New(t)
 
 			ipfsServer := httptest.NewServer(http.HandlerFunc(mockHandler))
 
@@ -213,10 +213,7 @@ func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request),
 
 			tempDB, err := tempdb.OpenUnique(ctx, dbURI, "ipfs-user-mapping-proxy")
 			require.NoError(t, err)
-			defer func() {
-				err := tempDB.Close()
-				require.NoError(t, err)
-			}()
+			defer ctx.Check(tempDB.Close)
 
 			log, err := zap.NewDevelopment()
 			require.NoError(t, err)
