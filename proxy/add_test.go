@@ -3,10 +3,12 @@ package proxy_test
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"net/url"
 	"os"
 	"sort"
@@ -160,7 +162,7 @@ func TestAddHandler_WrapWithDirectory(t *testing.T) {
 		err := addFile(proxy.URL+"?wrap-with-directory", "test", "test.png", 1024)
 		require.NoError(t, err)
 
-		// Check that the DB contains the wrapped directory
+		// Check that the DB contains the wrapping directory
 		contents, err := db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
@@ -176,7 +178,7 @@ func TestAddHandler_WrapWithDirectoryTrue(t *testing.T) {
 		err := addFile(proxy.URL+"?wrap-with-directory=true", "test", "test.png", 1024)
 		require.NoError(t, err)
 
-		// Check that the DB contains the wrapped directory
+		// Check that the DB contains the wrapping directory
 		contents, err := db.List(ctx)
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
@@ -203,6 +205,38 @@ func TestAddHandler_WrapWithDirectoryFalse(t *testing.T) {
 	})
 }
 
+func TestAddHandler_Dir(t *testing.T) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
+		err := addDir(proxy.URL, "test", "testdir", 3, 1024)
+		require.NoError(t, err)
+
+		// Check that the DB contains the directory
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Len(t, contents, 1)
+		assert.Equal(t, "test", contents[0].User)
+		assert.Equal(t, "testdir", contents[0].Name)
+		assert.Equal(t, int64(3*1024+len("testdir")), contents[0].Size)
+		assert.WithinDuration(t, time.Now(), contents[0].Created, 1*time.Minute)
+	})
+}
+
+func TestAddHandler_Dir_WrapWithDirectory(t *testing.T) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
+		err := addDir(proxy.URL+"?wrap-with-directory", "test", "testdir", 3, 1024)
+		require.NoError(t, err)
+
+		// Check that the DB contains the wrapping directory
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Len(t, contents, 1)
+		assert.Equal(t, "test", contents[0].User)
+		assert.Equal(t, "testdir (wrapped)", contents[0].Name)
+		assert.Equal(t, int64(3*1024+2*len("testdir")), contents[0].Size)
+		assert.WithinDuration(t, time.Now(), contents[0].Created, 1*time.Minute)
+	})
+}
+
 func addFile(url, user, fileName string, fileSize int) error {
 	req, err := addRequest(url, user, fileName, fileSize)
 	if err != nil {
@@ -217,7 +251,7 @@ func addFile(url, user, fileName string, fileSize int) error {
 		return fmt.Errorf("unexpected response status code: expected %d, got %d", http.StatusOK, resp.StatusCode)
 	}
 
-	_, err = ioutil.ReadAll(resp.Body)
+	_, err = io.Copy(ioutil.Discard, resp.Body)
 	if err != nil {
 		return err
 	}
@@ -229,17 +263,25 @@ func addFile(url, user, fileName string, fileSize int) error {
 func addRequest(url, user, fileName string, fileSize int) (*http.Request, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
-	fw, err := writer.CreateFormFile("file", fileName)
+
+	err := func() error {
+		defer writer.Close()
+
+		fw, err := writer.CreateFormFile("file", fileName)
+		if err != nil {
+			return err
+		}
+
+		fw.Write(testrand.BytesInt(fileSize))
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}()
 	if err != nil {
 		return nil, err
 	}
-
-	fw.Write(testrand.BytesInt(fileSize))
-	if err != nil {
-		return nil, err
-	}
-
-	writer.Close()
 
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body.Bytes()))
 	if err != nil {
@@ -253,6 +295,71 @@ func addRequest(url, user, fileName string, fileSize int) (*http.Request, error)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
 	return req, nil
+}
+
+func addDir(url, user, folderName string, fileCount, fileSize int) error {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	err := func() error {
+		defer writer.Close()
+
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, folderName))
+		h.Set("Content-Type", "application/x-directory")
+		_, err := writer.CreatePart(h)
+		if err != nil {
+			return err
+		}
+
+		for i := 0; i < fileCount; i++ {
+			h := make(textproto.MIMEHeader)
+			h.Set("Abspath", fmt.Sprintf("/home/%s/%s/file%d", user, folderName, i))
+			h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s%%2Ffile%d"`, folderName, i))
+			h.Set("Content-Type", "application/octet-stream")
+			fw, err := writer.CreatePart(h)
+			if err != nil {
+				return err
+			}
+
+			fw.Write(testrand.BytesInt(fileSize))
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body.Bytes()))
+	if err != nil {
+		return err
+	}
+
+	if len(user) > 0 {
+		req.SetBasicAuth(user, "somepassword")
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected response status code: expected %d, got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	_, err = io.Copy(ioutil.Discard, resp.Body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
 }
 
 func sortByCreated(contents []db.Content) {

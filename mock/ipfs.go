@@ -4,7 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"hash"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 
@@ -19,33 +22,16 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := ioutil.ReadAll(file)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	hasher := sha256.New()
-	_, err = hasher.Write([]byte(fileHeader.Filename))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	body, err := json.Marshal(&proxy.AddResponseMessage{
-		Name: fileHeader.Filename,
-		Hash: base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
-		Size: strconv.Itoa(len(content)),
-	})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	_, err = w.Write(body)
+	var totalSize int
+	var hasher hash.Hash
+	if isDir(fileHeader) {
+		totalSize, hasher, err = processDir(r, w)
+	} else {
+		totalSize, hasher, err = processFile(w, file, fileHeader)
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -55,10 +41,11 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hasher.Write([]byte(" (wrapped)"))
+	totalSize += len(fileHeader.Filename)
 
 	wrapped, err := json.Marshal(&proxy.AddResponseMessage{
 		Hash: base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
-		Size: strconv.Itoa(len(content) + len(fileHeader.Filename)),
+		Size: strconv.Itoa(totalSize),
 	})
 	if err != nil {
 		panic(err)
@@ -68,4 +55,84 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func isDir(header *multipart.FileHeader) bool {
+	return header.Header.Get("Content-Type") == "application/x-directory"
+}
+
+func processDir(r *http.Request, w http.ResponseWriter) (int, hash.Hash, error) {
+	var folderName string
+	var totalSize int
+	for i, fh := range r.MultipartForm.File["file"] {
+		if i == 0 {
+			folderName = fh.Filename
+			continue
+		}
+
+		f, err := fh.Open()
+		if err != nil {
+			return 0, nil, err
+		}
+
+		size, _, err := processFile(w, f, fh)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		totalSize += size
+	}
+
+	totalSize += len(folderName)
+
+	hasher := sha256.New()
+	_, err := hasher.Write([]byte(folderName))
+	if err != nil {
+		return 0, nil, err
+	}
+
+	body, err := json.Marshal(&proxy.AddResponseMessage{
+		Name: folderName,
+		Hash: base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
+		Size: strconv.Itoa(totalSize),
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	_, err = w.Write(body)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return totalSize, hasher, nil
+}
+
+func processFile(w http.ResponseWriter, file multipart.File, header *multipart.FileHeader) (int, hash.Hash, error) {
+	_, err := io.Copy(ioutil.Discard, file)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	hasher := sha256.New()
+	_, err = hasher.Write([]byte(header.Filename))
+	if err != nil {
+		return 0, nil, err
+	}
+
+	body, err := json.Marshal(&proxy.AddResponseMessage{
+		Name: header.Filename,
+		Hash: base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
+		Size: strconv.Itoa(int(header.Size)),
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	_, err = w.Write(body)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return int(header.Size), hasher, nil
 }
