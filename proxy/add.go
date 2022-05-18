@@ -105,7 +105,15 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 	name := messages[len(messages)-1].Name
 	if WrapWithDirectory(r) {
-		name = messages[0].Name + " (wrapped)"
+		if len(messages) == 1 {
+			mon.Counter("error_only_one_response_message_wrap_with_directory").Inc(1)
+			p.log.Error("Only one response message for wrap-with-directory",
+				zap.String("User", user),
+				zap.ByteString("Body", wrapper.Body),
+				zap.Error(err))
+			return errors.New("only one response message for wrap-with-directory")
+		}
+		name = messages[len(messages)-2].Name + " (wrapped)"
 	}
 
 	hash := messages[len(messages)-1].Hash
