@@ -59,6 +59,23 @@ func TestAddHandler_InternalError(t *testing.T) {
 	})
 }
 
+func TestAddHandler_InvalidQueryParams(t *testing.T) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
+		// Pass an invalid query param
+		req, err := addRequest(proxy.URL+"?silent", "test", "test.png", 1024)
+		require.NoError(t, err)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+		// Check that DB is still empty
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Empty(t, contents)
+	})
+}
+
 func TestAddHandler(t *testing.T) {
 	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
 		// Upload a file
@@ -135,6 +152,60 @@ func TestAddHandler(t *testing.T) {
 		assert.Equal(t, "john", contents[3].User)
 		assert.Equal(t, "third.jpg", contents[3].Name)
 		assert.Equal(t, int64(12987), contents[3].Size)
+	})
+}
+
+func TestAddHandler_WrapWithDirectory(t *testing.T) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
+		err := addFile(proxy.URL+"?wrap-with-directory", "test", "test.png", 1024)
+		require.NoError(t, err)
+
+		// Check that the DB contains it
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Len(t, contents, 1)
+
+		content1 := contents[0]
+		assert.Equal(t, "test", content1.User)
+		assert.Equal(t, "test.png (wrapped)", content1.Name)
+		assert.Equal(t, int64(1024+len("test.png")), content1.Size)
+		assert.WithinDuration(t, time.Now(), content1.Created, 1*time.Minute)
+	})
+}
+
+func TestAddHandler_WrapWithDirectoryTrue(t *testing.T) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
+		err := addFile(proxy.URL+"?wrap-with-directory=true", "test", "test.png", 1024)
+		require.NoError(t, err)
+
+		// Check that the DB contains it
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Len(t, contents, 1)
+
+		content1 := contents[0]
+		assert.Equal(t, "test", content1.User)
+		assert.Equal(t, "test.png (wrapped)", content1.Name)
+		assert.Equal(t, int64(1024+len("test.png")), content1.Size)
+		assert.WithinDuration(t, time.Now(), content1.Created, 1*time.Minute)
+	})
+}
+
+func TestAddHandler_WrapWithDirectoryFalse(t *testing.T) {
+	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
+		err := addFile(proxy.URL+"?wrap-with-directory=false", "test", "test.png", 1024)
+		require.NoError(t, err)
+
+		// Check that the DB contains it
+		contents, err := db.List(ctx)
+		require.NoError(t, err)
+		require.Len(t, contents, 1)
+
+		content1 := contents[0]
+		assert.Equal(t, "test", content1.User)
+		assert.Equal(t, "test.png", content1.Name)
+		assert.Equal(t, int64(1024), content1.Size)
+		assert.WithinDuration(t, time.Now(), content1.Created, 1*time.Minute)
 	})
 }
 
