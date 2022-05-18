@@ -49,7 +49,9 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 			continue
 		default:
 			mon.Counter("add_handler_invalid_query_param", monkit.NewSeriesTag("param", param)).Inc(1)
-			p.log.Error("Invalid query param", zap.String("Param", param))
+			p.log.Error("Invalid query param",
+				zap.String("User", user),
+				zap.String("Param", param))
 			err = errors.New("only wrap-with-directory argument is allowed")
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return err
@@ -65,7 +67,10 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 	if code != http.StatusOK {
 		if code > 400 && code != http.StatusBadGateway {
 			// BadGateway is logged by the proxy error handler
-			p.log.Error("Proxy error", zap.Int("Code", code), zap.ByteString("Body", wrapper.Body))
+			p.log.Error("Proxy error",
+				zap.String("User", user),
+				zap.Int("Code", code),
+				zap.ByteString("Body", wrapper.Body))
 		}
 		return err
 	}
@@ -80,7 +85,10 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 		}
 		if err != nil {
 			mon.Counter("error_unmarshal_response").Inc(1)
-			p.log.Error("JSON response unmarshal error", zap.ByteString("Body", wrapper.Body), zap.Error(err))
+			p.log.Error("JSON response unmarshal error",
+				zap.String("User", user),
+				zap.ByteString("Body", wrapper.Body),
+				zap.Error(err))
 			return err
 		}
 		messages = append(messages, msg)
@@ -88,7 +96,10 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 	if len(messages) == 0 {
 		mon.Counter("error_no_response_message").Inc(1)
-		p.log.Error("No response message", zap.ByteString("Body", wrapper.Body), zap.Error(err))
+		p.log.Error("No response message",
+			zap.String("User", user),
+			zap.ByteString("Body", wrapper.Body),
+			zap.Error(err))
 		return errors.New("no response message")
 	}
 
@@ -102,7 +113,9 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 	size, err := strconv.ParseInt(messages[len(messages)-1].Size, 10, 64)
 	if err != nil {
 		mon.Counter("error_parse_size").Inc(1)
-		p.log.Error("Size parse error", zap.String("Size", messages[len(messages)-1].Size), zap.Error(err))
+		p.log.Error("Size parse error",
+			zap.String("User", user),
+			zap.String("Size", messages[len(messages)-1].Size), zap.Error(err))
 		return err
 	}
 

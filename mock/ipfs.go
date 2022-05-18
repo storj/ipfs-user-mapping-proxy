@@ -47,8 +47,7 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write(body)
 	if err != nil {
-		// p.log.Error("JSON response unmarshal error", zap.ByteString("Body", wrapper.Body), zap.Error(err))
-		return
+		panic(err)
 	}
 
 	if !proxy.WrapWithDirectory(r) {
@@ -62,13 +61,11 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 		Size: strconv.Itoa(len(content) + len(fileHeader.Filename)),
 	})
 	if err != nil {
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		panic(err)
 	}
 
 	_, err = w.Write(wrapped)
 	if err != nil {
-		// p.log.Error("JSON response unmarshal error", zap.ByteString("Body", wrapper.Body), zap.Error(err))
-		return
+		panic(err)
 	}
 }
