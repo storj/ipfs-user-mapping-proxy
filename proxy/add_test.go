@@ -272,7 +272,7 @@ func addRequest(url, user, fileName string, fileSize int) (*http.Request, error)
 			return err
 		}
 
-		fw.Write(testrand.BytesInt(fileSize))
+		_, err = fw.Write(testrand.BytesInt(fileSize))
 		if err != nil {
 			return err
 		}
@@ -322,7 +322,7 @@ func addDir(url, user, folderName string, fileCount, fileSize int) error {
 				return err
 			}
 
-			fw.Write(testrand.BytesInt(fileSize))
+			_, err = fw.Write(testrand.BytesInt(fileSize))
 			if err != nil {
 				return err
 			}
