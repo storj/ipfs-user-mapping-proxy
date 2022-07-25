@@ -157,6 +157,38 @@ func TestAddHandler(t *testing.T) {
 	})
 }
 
+func TestAddHandler_CidVersion(t *testing.T) {
+	for _, tt := range []struct {
+		version string
+		err     bool
+	}{
+		{version: "", err: true},
+		{version: "0", err: false},
+		{version: "1", err: false},
+		{version: "2", err: true},
+		{version: "x", err: true},
+	} {
+		tt := tt
+		runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
+			err := addFile(proxy.URL+"?cid-version="+tt.version, "test", "test.png", 1024)
+			if tt.err {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+
+			// Check that the DB contains the wrapping directory
+			contents, err := db.List(ctx)
+			require.NoError(t, err)
+			require.Len(t, contents, 1)
+			assert.Equal(t, "test", contents[0].User)
+			assert.Equal(t, "test.png", contents[0].Name)
+			assert.Equal(t, int64(1024), contents[0].Size)
+			assert.WithinDuration(t, time.Now(), contents[0].Created, 1*time.Minute)
+		})
+	}
+}
+
 func TestAddHandler_WrapWithDirectory(t *testing.T) {
 	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, proxy *httptest.Server, db *db.DB) {
 		err := addFile(proxy.URL+"?wrap-with-directory", "test", "test.png", 1024)
