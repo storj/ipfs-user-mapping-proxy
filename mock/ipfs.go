@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"hash"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,21 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
+	}
+
+	if r.URL.Query().Has("cid-version") {
+		switch v := r.URL.Query().Get("cid-version"); v {
+		case "":
+			http.Error(w, "empty value not allowed for cid-version", http.StatusBadRequest)
+			return
+		case "0":
+			break
+		case "1":
+			break
+		default:
+			http.Error(w, fmt.Sprintf("value '%s' not allowed for cid-version", v), http.StatusBadRequest)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -45,6 +45,8 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 	for param := range r.URL.Query() {
 		switch param {
+		case "cid-version":
+			continue
 		case "wrap-with-directory":
 			continue
 		default:
@@ -52,7 +54,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 			p.log.Error("Invalid query param",
 				zap.String("User", user),
 				zap.String("Param", param))
-			err = errors.New("only wrap-with-directory argument is allowed")
+			err = errors.New("only wrap-with-directory and cid-version arguments are allowed")
 			http.Error(w, err.Error(), http.StatusForbidden)
 			return err
 		}
