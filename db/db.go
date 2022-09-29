@@ -12,6 +12,7 @@ import (
 
 	"storj.io/private/dbutil"
 	"storj.io/private/dbutil/cockroachutil" // registers cockroach as a tagsql driver.
+	"storj.io/private/dbutil/pgutil"
 	"storj.io/private/migrate"
 	"storj.io/private/tagsql"
 )
@@ -35,6 +36,9 @@ type Content struct {
 	// Created is when the content was uploaded.
 	Created time.Time
 
+	// Removed is when the content was removed. Nil if not removed yet.
+	Removed *time.Time
+
 	// Hash is the IPFS hash of the uploaded content.
 	Hash string
 
@@ -43,6 +47,15 @@ type Content struct {
 
 	// Size is the size in bytes of the uploaded content.
 	Size int64
+}
+
+// UserHashPair represents the user and hash values of a content record in the database.
+type UserHashPair struct {
+	// User is the user who uploaded the content.
+	User string
+
+	// Hash is the IPFS hash of the uploaded content.
+	Hash string
 }
 
 // Open creates instance of the database.
@@ -143,6 +156,14 @@ func (db *DB) Migration() *migrate.Migration {
 					return nil
 				}),
 			},
+			{
+				DB:          &db.DB,
+				Description: "Add removed column to keep track of when a content was removed.",
+				Version:     4,
+				Action: migrate.SQL{
+					`ALTER TABLE content ADD COLUMN removed TIMESTAMP;`,
+				},
+			},
 		},
 	}
 }
@@ -153,10 +174,11 @@ func (db *DB) Migration() *migrate.Migration {
 func (db *DB) Add(ctx context.Context, content Content) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	result, err := db.Exec(ctx, `
+	result, err := db.ExecContext(ctx, `
 		INSERT INTO content (username, hash, name, size)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (username, hash) DO NOTHING
+		ON CONFLICT (username, hash)
+		DO UPDATE SET removed = NULL
 	`, content.User, content.Hash, content.Name, content.Size)
 	if err != nil {
 		return Error.Wrap(err)
@@ -172,12 +194,12 @@ func (db *DB) Add(ctx context.Context, content Content) (err error) {
 	return nil
 }
 
-// List returns all content records from the database.
-func (db *DB) List(ctx context.Context) (result []Content, err error) {
+// ListAll returns all content records from the database.
+func (db *DB) ListAll(ctx context.Context) (result []Content, err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	rows, err := db.Query(ctx, `
-		SELECT username, created, hash, name, size
+	rows, err := db.QueryContext(ctx, `
+		SELECT username, created, removed, hash, name, size
 		FROM content
 	`)
 	if err != nil {
@@ -187,7 +209,7 @@ func (db *DB) List(ctx context.Context) (result []Content, err error) {
 
 	for rows.Next() {
 		var content Content
-		err := rows.Scan(&content.User, &content.Created, &content.Hash, &content.Name, &content.Size)
+		err := rows.Scan(&content.User, &content.Created, &content.Removed, &content.Hash, &content.Name, &content.Size)
 		if err != nil {
 			return nil, Error.Wrap(err)
 		}
@@ -195,6 +217,61 @@ func (db *DB) List(ctx context.Context) (result []Content, err error) {
 	}
 
 	return result, nil
+}
+
+// ListActiveContentByHash returns all active (not removed) content records that match hashes.
+func (db *DB) ListActiveContentByHash(ctx context.Context, hashes []string) (result []UserHashPair, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT username, hash
+		FROM content
+		WHERE
+			hash = ANY($1) AND
+			removed IS NULL;
+	`, pgutil.TextArray(hashes))
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var content UserHashPair
+		err := rows.Scan(&content.User, &content.Hash)
+		if err != nil {
+			return nil, Error.Wrap(err)
+		}
+		result = append(result, content)
+	}
+
+	return result, nil
+}
+
+// RemoveContentByHashForUser updates the remove column for all content that matches user and hashes.
+func (db *DB) RemoveContentByHashForUser(ctx context.Context, user string, hashes []string) (err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	result, err := db.ExecContext(ctx, `
+		UPDATE content
+		SET
+			removed = NOW()
+		WHERE
+			username = $1 AND
+			hash = ANY($2) AND
+			removed IS NULL;
+	`, user, pgutil.TextArray(hashes))
+	if err != nil {
+		return Error.Wrap(err)
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return Error.Wrap(err)
+	}
+
+	mon.Counter("remove_content_by_hash_for_user_db_affected_rows", monkit.NewSeriesTag("rows", strconv.FormatInt(affected, 10))).Inc(1)
+
+	return nil
 }
 
 // Wrap turns a tagsql.DB into a DB struct.

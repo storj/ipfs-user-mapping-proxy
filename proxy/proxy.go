@@ -14,12 +14,18 @@ import (
 
 var mon = monkit.Package()
 
+const (
+	AddEndpoint   = "/api/v0/add"
+	PinRmEndpoint = "/api/v0/pin/rm"
+)
+
 // Proxy is a reverse proxy to the IPFS node's HTTP API that
 // maps uploaded content to the authenticated user.
 type Proxy struct {
 	log     *zap.Logger
 	db      *db.DB
 	address string
+	target  *url.URL
 	proxy   *httputil.ReverseProxy
 }
 
@@ -36,6 +42,7 @@ func New(log *zap.Logger, db *db.DB, address string, target *url.URL) *Proxy {
 		log:     log,
 		db:      db,
 		address: address,
+		target:  target,
 		proxy:   proxy,
 	}
 }
@@ -44,7 +51,12 @@ func New(log *zap.Logger, db *db.DB, address string, target *url.URL) *Proxy {
 func (p *Proxy) Run(ctx context.Context) (err error) {
 	defer mon.Task()(&ctx)(&err)
 
-	http.HandleFunc("/api/v0/add", p.HandleAdd)
+	return http.ListenAndServe(p.address, p.ServeMux())
+}
 
-	return http.ListenAndServe(p.address, nil)
+func (p *Proxy) ServeMux() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc(AddEndpoint, p.HandleAdd)
+	mux.HandleFunc(PinRmEndpoint, p.HandlePinRm)
+	return mux
 }

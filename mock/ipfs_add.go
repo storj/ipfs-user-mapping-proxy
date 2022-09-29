@@ -40,13 +40,14 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	jw := json.NewEncoder(w)
 
 	var totalSize int
 	var hasher hash.Hash
 	if isDir(fileHeader) {
-		totalSize, hasher, err = processDir(r, w)
+		totalSize, hasher, err = processDir(r, jw)
 	} else {
-		totalSize, hasher, err = processFile(w, file, fileHeader)
+		totalSize, hasher, err = processFile(jw, file, fileHeader)
 	}
 	if err != nil {
 		panic(err)
@@ -59,15 +60,10 @@ func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
 	hasher.Write([]byte(" (wrapped)"))
 	totalSize += len(fileHeader.Filename)
 
-	wrapped, err := json.Marshal(&proxy.AddResponseMessage{
+	err = jw.Encode(proxy.AddResponseMessage{
 		Hash: base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
 		Size: strconv.Itoa(totalSize),
 	})
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = w.Write(wrapped)
 	if err != nil {
 		panic(err)
 	}
@@ -77,7 +73,7 @@ func isDir(header *multipart.FileHeader) bool {
 	return header.Header.Get("Content-Type") == "application/x-directory"
 }
 
-func processDir(r *http.Request, w http.ResponseWriter) (int, hash.Hash, error) {
+func processDir(r *http.Request, jw *json.Encoder) (int, hash.Hash, error) {
 	var folderName string
 	var totalSize int
 	for i, fh := range r.MultipartForm.File["file"] {
@@ -91,7 +87,7 @@ func processDir(r *http.Request, w http.ResponseWriter) (int, hash.Hash, error) 
 			return 0, nil, err
 		}
 
-		size, _, err := processFile(w, f, fh)
+		size, _, err := processFile(jw, f, fh)
 		if err != nil {
 			return 0, nil, err
 		}
@@ -107,7 +103,7 @@ func processDir(r *http.Request, w http.ResponseWriter) (int, hash.Hash, error) 
 		return 0, nil, err
 	}
 
-	body, err := json.Marshal(&proxy.AddResponseMessage{
+	err = jw.Encode(proxy.AddResponseMessage{
 		Name: folderName,
 		Hash: base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
 		Size: strconv.Itoa(totalSize),
@@ -116,15 +112,10 @@ func processDir(r *http.Request, w http.ResponseWriter) (int, hash.Hash, error) 
 		return 0, nil, err
 	}
 
-	_, err = w.Write(body)
-	if err != nil {
-		return 0, nil, err
-	}
-
 	return totalSize, hasher, nil
 }
 
-func processFile(w http.ResponseWriter, file multipart.File, header *multipart.FileHeader) (int, hash.Hash, error) {
+func processFile(jw *json.Encoder, file multipart.File, header *multipart.FileHeader) (int, hash.Hash, error) {
 	_, err := io.Copy(ioutil.Discard, file)
 	if err != nil {
 		return 0, nil, err
@@ -136,16 +127,11 @@ func processFile(w http.ResponseWriter, file multipart.File, header *multipart.F
 		return 0, nil, err
 	}
 
-	body, err := json.Marshal(&proxy.AddResponseMessage{
+	err = jw.Encode(proxy.AddResponseMessage{
 		Name: header.Filename,
 		Hash: base64.URLEncoding.EncodeToString(hasher.Sum(nil)),
 		Size: strconv.Itoa(int(header.Size)),
 	})
-	if err != nil {
-		return 0, nil, err
-	}
-
-	_, err = w.Write(body)
 	if err != nil {
 		return 0, nil, err
 	}

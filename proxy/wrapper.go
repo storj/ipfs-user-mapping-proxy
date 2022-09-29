@@ -1,6 +1,8 @@
 package proxy
 
-import "net/http"
+import (
+	"net/http"
+)
 
 // ResponseWriterWrapper wraps a ResponseWriter and makes a copy of its
 // StatusCode and Body in public fields.
