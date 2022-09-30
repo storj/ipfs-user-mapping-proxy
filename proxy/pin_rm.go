@@ -105,7 +105,7 @@ func (p *Proxy) handlePinRm(ctx context.Context, w http.ResponseWriter, r *http.
 	if len(backendArgs) == 0 {
 		// All content requested for removal is pinned by other users.
 		// No need to request the backend. Just send a success response back to the client.
-		return writeResponse(w, toRemove)
+		return writePinRmResponse(w, toRemove)
 	}
 
 	// Request the backend with only the hashes remaining in backendArg.
@@ -122,7 +122,7 @@ func (p *Proxy) handlePinRm(ctx context.Context, w http.ResponseWriter, r *http.
 		mon.Counter("pin_rm_handler_error_backend_request").Inc(1)
 		p.log.Error("Error requesting backend", zap.Error(err))
 		// Send a success response.
-		return writeResponse(w, toRemove)
+		return writePinRmResponse(w, toRemove)
 	}
 
 	code := resp.StatusCode
@@ -147,14 +147,14 @@ func (p *Proxy) handlePinRm(ctx context.Context, w http.ResponseWriter, r *http.
 		mon.Counter("pin_rm_handler_error_discard_backend_respond").Inc(1)
 		p.log.Error("Error discarding backend response", zap.Error(err))
 		// Send a success response.
-		return writeResponse(w, toRemove)
+		return writePinRmResponse(w, toRemove)
 	}
 
 	// Send our own success response.
-	return writeResponse(w, toRemove)
+	return writePinRmResponse(w, toRemove)
 }
 
-func writeResponse(w http.ResponseWriter, pins []string) error {
+func writePinRmResponse(w http.ResponseWriter, pins []string) error {
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(PinRmResponseMessage{Pins: pins})
 }

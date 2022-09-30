@@ -80,7 +80,7 @@ func TestPinRmHandler_InvalidQueryParams(t *testing.T) {
 		require.NoError(t, err)
 
 		// Pass an invalid query param.
-		req, err := pinRmRequest(server.URL+proxy.PinRmEndpoint+"?recursive", "john")
+		req, err := pinRmRequest(server.URL+proxy.PinRmEndpoint+"?recursive", "john", "pin-hash-1")
 		require.NoError(t, err)
 
 		resp, err := http.DefaultClient.Do(req)
