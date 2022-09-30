@@ -37,7 +37,7 @@ func (p *Proxy) handlePinLs(ctx context.Context, w http.ResponseWriter, r *http.
 		return err
 	}
 
-	for param, _ := range r.URL.Query() {
+	for param := range r.URL.Query() {
 		switch param {
 		default:
 			mon.Counter("pin_ls_handler_invalid_query_param", monkit.NewSeriesTag("param", param)).Inc(1)
