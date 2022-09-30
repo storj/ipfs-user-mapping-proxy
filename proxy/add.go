@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -55,7 +56,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 				zap.String("User", user),
 				zap.String("Param", param))
 			err = errors.New("only wrap-with-directory and cid-version arguments are allowed")
-			http.Error(w, err.Error(), http.StatusForbidden)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return err
 		}
 	}
@@ -74,7 +75,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 				zap.Int("Code", code),
 				zap.ByteString("Body", wrapper.Body))
 		}
-		return err
+		return fmt.Errorf("Proxy error (code %d)", code)
 	}
 
 	decoder := json.NewDecoder(strings.NewReader(string(wrapper.Body)))
@@ -86,7 +87,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 			break
 		}
 		if err != nil {
-			mon.Counter("error_unmarshal_response").Inc(1)
+			mon.Counter("add_handler_error_unmarshal_response").Inc(1)
 			p.log.Error("JSON response unmarshal error",
 				zap.String("User", user),
 				zap.ByteString("Body", wrapper.Body),
@@ -97,7 +98,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 
 	if len(messages) == 0 {
-		mon.Counter("error_no_response_message").Inc(1)
+		mon.Counter("add_handler_error_no_response_message").Inc(1)
 		p.log.Error("No response message",
 			zap.String("User", user),
 			zap.ByteString("Body", wrapper.Body),
@@ -108,7 +109,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 	name := messages[len(messages)-1].Name
 	if WrapWithDirectory(r) {
 		if len(messages) == 1 {
-			mon.Counter("error_only_one_response_message_wrap_with_directory").Inc(1)
+			mon.Counter("add_handler_error_only_one_response_message_wrap_with_directory").Inc(1)
 			p.log.Error("Only one response message for wrap-with-directory",
 				zap.String("User", user),
 				zap.ByteString("Body", wrapper.Body),
@@ -122,7 +123,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 
 	size, err := strconv.ParseInt(messages[len(messages)-1].Size, 10, 64)
 	if err != nil {
-		mon.Counter("error_parse_size").Inc(1)
+		mon.Counter("add_handler_error_parse_size").Inc(1)
 		p.log.Error("Size parse error",
 			zap.String("User", user),
 			zap.String("Size", messages[len(messages)-1].Size), zap.Error(err))
@@ -136,7 +137,7 @@ func (p *Proxy) handleAdd(ctx context.Context, w http.ResponseWriter, r *http.Re
 		Size: size,
 	})
 	if err != nil {
-		mon.Counter("error_db_add").Inc(1)
+		mon.Counter("add_handler_error_db_add").Inc(1)
 		p.log.Error("Error adding content to database",
 			zap.String("User", user),
 			zap.String("Hash", hash),
