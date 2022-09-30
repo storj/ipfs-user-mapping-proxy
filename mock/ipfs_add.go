@@ -16,7 +16,11 @@ import (
 )
 
 // IPFSAddHandler is an HTTP handler that mocks the /api/v0/add enpoint of an IPFS Node.
-func IPFSAddHandler(w http.ResponseWriter, r *http.Request) {
+type IPFSAddHandler struct{}
+
+func (h *IPFSAddHandler) Reset() {}
+
+func (h *IPFSAddHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

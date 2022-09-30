@@ -20,8 +20,8 @@ import (
 )
 
 func TestPinRmHandler_MissingBasicAuth(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *proxydb.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *proxydb.DB) {
 		// Add a record to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -42,12 +42,12 @@ func TestPinRmHandler_MissingBasicAuth(t *testing.T) {
 		assert.Nil(t, contents[0].Removed)
 
 		// Check that the IPFS backend was not invoked.
-		assert.False(t, ipfsBackend.Invoked)
+		assert.False(t, ipfsHandler.Invoked)
 	})
 }
 
 func TestPinRmHandler_InternalError(t *testing.T) {
-	runTest(t, mock.ErrorHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *proxydb.DB) {
+	runTest(t, new(mock.ErrorHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *proxydb.DB) {
 		// Add a record to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -71,8 +71,8 @@ func TestPinRmHandler_InternalError(t *testing.T) {
 }
 
 func TestPinRmHandler_InvalidQueryParams(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add a record to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -94,13 +94,13 @@ func TestPinRmHandler_InvalidQueryParams(t *testing.T) {
 		assert.Nil(t, contents[0].Removed)
 
 		// Check that the IPFS backend was not invoked.
-		assert.False(t, ipfsBackend.Invoked)
+		assert.False(t, ipfsHandler.Invoked)
 	})
 }
 
 func TestPinRmHandler_NoArgs(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add a record to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -122,13 +122,13 @@ func TestPinRmHandler_NoArgs(t *testing.T) {
 		assert.Nil(t, contents[0].Removed)
 
 		// Check that the IPFS backend was not invoked.
-		assert.False(t, ipfsBackend.Invoked)
+		assert.False(t, ipfsHandler.Invoked)
 	})
 }
 
 func TestPinRmHandle_Basic(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add a record to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -154,14 +154,14 @@ func TestPinRmHandle_Basic(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), *contents[0].Removed, 1*time.Minute)
 
 		// Check that the IPFS backend unpinned the content.
-		assert.True(t, ipfsBackend.Invoked)
-		assert.Equal(t, []string{"pin-hash-1"}, ipfsBackend.Removed)
+		assert.True(t, ipfsHandler.Invoked)
+		assert.Equal(t, []string{"pin-hash-1"}, ipfsHandler.Removed)
 	})
 }
 
 func TestPinRmHandle_MultiplePins(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add a record to the database pinned by two different users.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -193,13 +193,13 @@ func TestPinRmHandle_MultiplePins(t *testing.T) {
 		assert.Nil(t, contents[1].Removed)
 
 		// Check that the IPFS backend was not invoked - the content must be still pinned for shawn.
-		assert.False(t, ipfsBackend.Invoked)
+		assert.False(t, ipfsHandler.Invoked)
 	})
 }
 
 func TestPinRmHandle_NonExistingPin(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add a record to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -221,13 +221,13 @@ func TestPinRmHandle_NonExistingPin(t *testing.T) {
 		assert.Nil(t, contents[0].Removed)
 
 		// Check that the IPFS backend was not invoked.
-		assert.False(t, ipfsBackend.Invoked)
+		assert.False(t, ipfsHandler.Invoked)
 	})
 }
 
 func TestPinRmHandle_SomeoneElsePin(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add a record to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -249,13 +249,13 @@ func TestPinRmHandle_SomeoneElsePin(t *testing.T) {
 		assert.Nil(t, contents[0].Removed)
 
 		// Check that the IPFS backend was not invoked.
-		assert.False(t, ipfsBackend.Invoked)
+		assert.False(t, ipfsHandler.Invoked)
 	})
 }
 
 func TestPinRmHandle_TwoOfThree(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add some records to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -292,14 +292,14 @@ func TestPinRmHandle_TwoOfThree(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), *contents[2].Removed, 1*time.Minute)
 
 		// Check that the IPFS backend unpinned the two files.
-		assert.True(t, ipfsBackend.Invoked)
-		assert.Equal(t, []string{"pin-hash-1", "pin-hash-3"}, ipfsBackend.Removed)
+		assert.True(t, ipfsHandler.Invoked)
+		assert.Equal(t, []string{"pin-hash-1", "pin-hash-3"}, ipfsHandler.Removed)
 	})
 }
 
 func TestPinRmHandle_OneExistsAndOneNot(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add some records to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -323,13 +323,13 @@ func TestPinRmHandle_OneExistsAndOneNot(t *testing.T) {
 		assert.Nil(t, contents[1].Removed)
 
 		// Check that the IPFS backend was not invoked.
-		assert.False(t, ipfsBackend.Invoked)
+		assert.False(t, ipfsHandler.Invoked)
 	})
 }
 
 func TestPinRmHandle_MultiMix(t *testing.T) {
-	ipfsBackend := mock.IPFSPinRmHandler{}
-	runTest(t, ipfsBackend.ServeHTTP, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	ipfsHandler := new(mock.IPFSPinRmHandler)
+	runTest(t, ipfsHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Add some records to the database.
 		err := prefillDB(ctx, db,
 			proxydb.Content{User: "john", Hash: "pin-hash-1", Name: "first.jpg", Size: 1024},
@@ -379,8 +379,8 @@ func TestPinRmHandle_MultiMix(t *testing.T) {
 		assert.Nil(t, contents[4].Removed)
 
 		// Check that the IPFS backend was invoked only for the second and third file, but not for the first file.
-		assert.True(t, ipfsBackend.Invoked)
-		assert.Equal(t, []string{"pin-hash-2", "pin-hash-3"}, ipfsBackend.Removed)
+		assert.True(t, ipfsHandler.Invoked)
+		assert.Equal(t, []string{"pin-hash-2", "pin-hash-3"}, ipfsHandler.Removed)
 	})
 }
 

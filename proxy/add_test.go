@@ -30,7 +30,7 @@ import (
 )
 
 func TestAddHandler_MissingBasicAuth(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		req, err := addRequest(server.URL+proxy.AddEndpoint, "", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -46,7 +46,7 @@ func TestAddHandler_MissingBasicAuth(t *testing.T) {
 }
 
 func TestAddHandler_InternalError(t *testing.T) {
-	runTest(t, mock.ErrorHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.ErrorHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		req, err := addRequest(server.URL+proxy.AddEndpoint, "test", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -62,7 +62,7 @@ func TestAddHandler_InternalError(t *testing.T) {
 }
 
 func TestAddHandler_InvalidQueryParams(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Pass an invalid query param
 		req, err := addRequest(server.URL+proxy.AddEndpoint+"?silent", "test", "test.png", 1024)
 		require.NoError(t, err)
@@ -78,8 +78,8 @@ func TestAddHandler_InvalidQueryParams(t *testing.T) {
 	})
 }
 
-func TestAddHandler(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+func TestAddHandler_Basic(t *testing.T) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Upload a file
 		err := addFile(server.URL+proxy.AddEndpoint, "john", "first.jpg", 1024)
 		require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestAddHandler_CidVersion(t *testing.T) {
 		{version: "x", err: true},
 	} {
 		tt := tt
-		runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+		runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 			err := addFile(server.URL+proxy.AddEndpoint+"?cid-version="+tt.version, "test", "test.png", 1024)
 			if tt.err {
 				require.Error(t, err)
@@ -194,7 +194,7 @@ func TestAddHandler_CidVersion(t *testing.T) {
 }
 
 func TestAddHandler_WrapWithDirectory(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory", "test", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -211,7 +211,7 @@ func TestAddHandler_WrapWithDirectory(t *testing.T) {
 }
 
 func TestAddHandler_WrapWithDirectoryTrue(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory=true", "test", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -228,7 +228,7 @@ func TestAddHandler_WrapWithDirectoryTrue(t *testing.T) {
 }
 
 func TestAddHandler_WrapWithDirectoryFalse(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory=false", "test", "test.png", 1024)
 		require.NoError(t, err)
 
@@ -245,7 +245,7 @@ func TestAddHandler_WrapWithDirectoryFalse(t *testing.T) {
 }
 
 func TestAddHandler_Dir(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		err := addDir(server.URL+proxy.AddEndpoint, "test", "testdir", 3, 1024)
 		require.NoError(t, err)
 
@@ -262,7 +262,7 @@ func TestAddHandler_Dir(t *testing.T) {
 }
 
 func TestAddHandler_Dir_WrapWithDirectory(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		err := addDir(server.URL+proxy.AddEndpoint+"?wrap-with-directory", "test", "testdir", 3, 1024)
 		require.NoError(t, err)
 
@@ -279,7 +279,7 @@ func TestAddHandler_Dir_WrapWithDirectory(t *testing.T) {
 }
 
 func TestPinRmHandle_Repin(t *testing.T) {
-	runTest(t, mock.IPFSAddHandler, func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
+	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Upload a file.
 		err := addFile(server.URL+proxy.AddEndpoint, "john", "first.jpg", 1024)
 		require.NoError(t, err)
@@ -447,15 +447,14 @@ func sortByCreated(contents []db.Content) {
 	})
 }
 
-func runTest(t *testing.T, mockHandler func(http.ResponseWriter, *http.Request), f func(*testing.T, *testcontext.Context, *httptest.Server, *db.DB)) {
+func runTest(t *testing.T, mockHandler mock.ResettableHandler, f func(*testing.T, *testcontext.Context, *httptest.Server, *db.DB)) {
 	for _, impl := range []dbutil.Implementation{dbutil.Postgres, dbutil.Cockroach} {
 		impl := impl
 		t.Run(strings.Title(impl.String()), func(t *testing.T) {
-			t.Parallel()
-
 			ctx := testcontext.New(t)
 
-			ipfsServer := httptest.NewServer(http.HandlerFunc(mockHandler))
+			mockHandler.Reset()
+			ipfsServer := httptest.NewServer(mockHandler)
 
 			dbURI := dbURI(t, impl)
 

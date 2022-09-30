@@ -3,6 +3,7 @@ package mock
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 
 	"storj.io/ipfs-user-mapping-proxy/proxy"
 )
@@ -13,8 +14,13 @@ type IPFSPinRmHandler struct {
 	Removed []string
 }
 
-func (handler *IPFSPinRmHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	handler.Invoked = true
+func (h *IPFSPinRmHandler) Reset() {
+	h.Invoked = false
+	h.Removed = nil
+}
+
+func (h *IPFSPinRmHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.Invoked = true
 
 	var toRemove []string
 	for param, value := range r.URL.Query() {
@@ -32,7 +38,8 @@ func (handler *IPFSPinRmHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	handler.Removed = append(handler.Removed, toRemove...)
+	sort.Strings(toRemove)
+	h.Removed = append(h.Removed, toRemove...)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
