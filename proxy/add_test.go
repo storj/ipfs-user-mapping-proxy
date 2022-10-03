@@ -453,6 +453,9 @@ func runTest(t *testing.T, mockHandler mock.ResettableHandler, f func(*testing.T
 		t.Run(strings.Title(impl.String()), func(t *testing.T) {
 			ctx := testcontext.New(t)
 
+			if mockHandler == nil {
+				mockHandler = new(mock.NoopHandler)
+			}
 			mockHandler.Reset()
 			ipfsServer := httptest.NewServer(mockHandler)
 

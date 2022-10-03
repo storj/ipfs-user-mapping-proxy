@@ -247,6 +247,34 @@ func (db *DB) ListActiveContentByHash(ctx context.Context, hashes []string) (res
 	return result, nil
 }
 
+// ListActiveContentByUser returns all active (not removed) content records that match user.
+func (db *DB) ListActiveContentByUser(ctx context.Context, user string) (hashes []string, err error) {
+	defer mon.Task()(&ctx)(&err)
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT hash
+		FROM content
+		WHERE
+			username = $1 AND
+			removed IS NULL;
+	`, user)
+	if err != nil {
+		return nil, Error.Wrap(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var hash string
+		err := rows.Scan(&hash)
+		if err != nil {
+			return nil, Error.Wrap(err)
+		}
+		hashes = append(hashes, hash)
+	}
+
+	return hashes, nil
+}
+
 // RemoveContentByHashForUser updates the remove column for all content that matches user and hashes.
 func (db *DB) RemoveContentByHashForUser(ctx context.Context, user string, hashes []string) (err error) {
 	defer mon.Task()(&ctx)(&err)
