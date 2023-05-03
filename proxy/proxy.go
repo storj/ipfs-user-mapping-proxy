@@ -15,9 +15,10 @@ import (
 var mon = monkit.Package()
 
 const (
-	AddEndpoint   = "/api/v0/add"
-	PinLsEndpoint = "/api/v0/pin/ls"
-	PinRmEndpoint = "/api/v0/pin/rm"
+	AddEndpoint       = "/api/v0/add"
+	DAGImportEndpoint = "/api/v0/dag/import"
+	PinLsEndpoint     = "/api/v0/pin/ls"
+	PinRmEndpoint     = "/api/v0/pin/rm"
 )
 
 // Proxy is a reverse proxy to the IPFS node's HTTP API that
@@ -58,6 +59,7 @@ func (p *Proxy) Run(ctx context.Context) (err error) {
 func (p *Proxy) ServeMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc(AddEndpoint, p.HandleAdd)
+	mux.HandleFunc(DAGImportEndpoint, p.HandleDAGImport)
 	mux.HandleFunc(PinLsEndpoint, p.HandlePinLs)
 	mux.HandleFunc(PinRmEndpoint, p.HandlePinRm)
 	return mux

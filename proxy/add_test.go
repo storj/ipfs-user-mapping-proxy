@@ -31,7 +31,7 @@ import (
 
 func TestAddHandler_MissingBasicAuth(t *testing.T) {
 	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
-		req, err := addRequest(server.URL+proxy.AddEndpoint, "", "test.png", 1024)
+		req, err := addRequest(server.URL+proxy.AddEndpoint, "", 1024, "test.png")
 		require.NoError(t, err)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -47,7 +47,7 @@ func TestAddHandler_MissingBasicAuth(t *testing.T) {
 
 func TestAddHandler_InternalError(t *testing.T) {
 	runTest(t, new(mock.ErrorHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
-		req, err := addRequest(server.URL+proxy.AddEndpoint, "test", "test.png", 1024)
+		req, err := addRequest(server.URL+proxy.AddEndpoint, "test", 1024, "test.png")
 		require.NoError(t, err)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -64,7 +64,7 @@ func TestAddHandler_InternalError(t *testing.T) {
 func TestAddHandler_InvalidQueryParams(t *testing.T) {
 	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Pass an invalid query param
-		req, err := addRequest(server.URL+proxy.AddEndpoint+"?silent", "test", "test.png", 1024)
+		req, err := addRequest(server.URL+proxy.AddEndpoint+"?silent", "test", 1024, "test.png")
 		require.NoError(t, err)
 
 		resp, err := http.DefaultClient.Do(req)
@@ -81,7 +81,7 @@ func TestAddHandler_InvalidQueryParams(t *testing.T) {
 func TestAddHandler_Basic(t *testing.T) {
 	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Upload a file
-		err := addFile(server.URL+proxy.AddEndpoint, "john", "first.jpg", 1024)
+		err := addFile(server.URL+proxy.AddEndpoint, "john", 1024, "first.jpg")
 		require.NoError(t, err)
 
 		// Check that the DB contains it
@@ -91,13 +91,14 @@ func TestAddHandler_Basic(t *testing.T) {
 
 		content1 := contents[0]
 		assert.Equal(t, "john", content1.User)
+		assert.Equal(t, mock.Hash("first.jpg"), content1.Hash)
 		assert.Equal(t, "first.jpg", content1.Name)
 		assert.Equal(t, int64(1024), content1.Size)
 		assert.WithinDuration(t, time.Now(), content1.Created, 1*time.Minute)
 		assert.Nil(t, content1.Removed)
 
 		// Upload the same file
-		err = addFile(server.URL+proxy.AddEndpoint, "john", "first.jpg", 1024)
+		err = addFile(server.URL+proxy.AddEndpoint, "john", 1024, "first.jpg")
 		require.NoError(t, err)
 
 		// Check that nothing changed in the DB
@@ -107,7 +108,7 @@ func TestAddHandler_Basic(t *testing.T) {
 		assert.Equal(t, content1, contents[0])
 
 		// Upload the same file, but by a different user
-		err = addFile(server.URL+proxy.AddEndpoint, "shawn", "first.jpg", 1024)
+		err = addFile(server.URL+proxy.AddEndpoint, "shawn", 1024, "first.jpg")
 		require.NoError(t, err)
 
 		// Check that both users have the same file
@@ -116,11 +117,12 @@ func TestAddHandler_Basic(t *testing.T) {
 		require.Len(t, contents, 2)
 		assert.Equal(t, content1, contents[0])
 		assert.Equal(t, "shawn", contents[1].User)
+		assert.Equal(t, content1.Hash, contents[1].Hash)
 		assert.Equal(t, content1.Name, contents[1].Name)
 		assert.Equal(t, content1.Size, contents[1].Size)
 
 		// Upload a different file with the second user
-		err = addFile(server.URL+proxy.AddEndpoint, "shawn", "second.jpg", 1234)
+		err = addFile(server.URL+proxy.AddEndpoint, "shawn", 1234, "second.jpg")
 		require.NoError(t, err)
 
 		// Check that the first user has one file, and the second - two files
@@ -131,14 +133,16 @@ func TestAddHandler_Basic(t *testing.T) {
 		require.Len(t, contents, 3)
 		assert.Equal(t, content1, contents[0])
 		assert.Equal(t, "shawn", contents[1].User)
+		assert.Equal(t, content1.Hash, contents[1].Hash)
 		assert.Equal(t, content1.Name, contents[1].Name)
 		assert.Equal(t, content1.Size, contents[1].Size)
 		assert.Equal(t, "shawn", contents[2].User)
+		assert.Equal(t, mock.Hash("second.jpg"), contents[2].Hash)
 		assert.Equal(t, "second.jpg", contents[2].Name)
 		assert.Equal(t, int64(1234), contents[2].Size)
 
 		// Upload a third file with the first user
-		err = addFile(server.URL+proxy.AddEndpoint, "john", "third.jpg", 12987)
+		err = addFile(server.URL+proxy.AddEndpoint, "john", 12987, "third.jpg")
 		require.NoError(t, err)
 
 		// Check that both users have two files
@@ -149,12 +153,15 @@ func TestAddHandler_Basic(t *testing.T) {
 		require.Len(t, contents, 4)
 		assert.Equal(t, content1, contents[0])
 		assert.Equal(t, "shawn", contents[1].User)
+		assert.Equal(t, content1.Hash, contents[1].Hash)
 		assert.Equal(t, content1.Name, contents[1].Name)
 		assert.Equal(t, content1.Size, contents[1].Size)
 		assert.Equal(t, "shawn", contents[2].User)
+		assert.Equal(t, mock.Hash("second.jpg"), contents[2].Hash)
 		assert.Equal(t, "second.jpg", contents[2].Name)
 		assert.Equal(t, int64(1234), contents[2].Size)
 		assert.Equal(t, "john", contents[3].User)
+		assert.Equal(t, mock.Hash("third.jpg"), contents[3].Hash)
 		assert.Equal(t, "third.jpg", contents[3].Name)
 		assert.Equal(t, int64(12987), contents[3].Size)
 	})
@@ -173,7 +180,7 @@ func TestAddHandler_CidVersion(t *testing.T) {
 	} {
 		tt := tt
 		runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
-			err := addFile(server.URL+proxy.AddEndpoint+"?cid-version="+tt.version, "test", "test.png", 1024)
+			err := addFile(server.URL+proxy.AddEndpoint+"?cid-version="+tt.version, "test", 1024, "test.png")
 			if tt.err {
 				require.Error(t, err)
 				return
@@ -185,6 +192,7 @@ func TestAddHandler_CidVersion(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, contents, 1)
 			assert.Equal(t, "test", contents[0].User)
+			assert.Equal(t, mock.Hash("test.png"), contents[0].Hash)
 			assert.Equal(t, "test.png", contents[0].Name)
 			assert.Equal(t, int64(1024), contents[0].Size)
 			assert.WithinDuration(t, time.Now(), contents[0].Created, 1*time.Minute)
@@ -195,7 +203,7 @@ func TestAddHandler_CidVersion(t *testing.T) {
 
 func TestAddHandler_WrapWithDirectory(t *testing.T) {
 	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
-		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory", "test", "test.png", 1024)
+		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory", "test", 1024, "test.png")
 		require.NoError(t, err)
 
 		// Check that the DB contains the wrapping directory
@@ -203,6 +211,7 @@ func TestAddHandler_WrapWithDirectory(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
 		assert.Equal(t, "test", contents[0].User)
+		assert.Equal(t, mock.Hash("test.png (wrapped)"), contents[0].Hash)
 		assert.Equal(t, "test.png (wrapped)", contents[0].Name)
 		assert.Equal(t, int64(1024+len("test.png")), contents[0].Size)
 		assert.WithinDuration(t, time.Now(), contents[0].Created, 1*time.Minute)
@@ -212,7 +221,7 @@ func TestAddHandler_WrapWithDirectory(t *testing.T) {
 
 func TestAddHandler_WrapWithDirectoryTrue(t *testing.T) {
 	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
-		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory=true", "test", "test.png", 1024)
+		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory=true", "test", 1024, "test.png")
 		require.NoError(t, err)
 
 		// Check that the DB contains the wrapping directory
@@ -220,6 +229,7 @@ func TestAddHandler_WrapWithDirectoryTrue(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
 		assert.Equal(t, "test", contents[0].User)
+		assert.Equal(t, mock.Hash("test.png (wrapped)"), contents[0].Hash)
 		assert.Equal(t, "test.png (wrapped)", contents[0].Name)
 		assert.Equal(t, int64(1024+len("test.png")), contents[0].Size)
 		assert.WithinDuration(t, time.Now(), contents[0].Created, 1*time.Minute)
@@ -229,7 +239,7 @@ func TestAddHandler_WrapWithDirectoryTrue(t *testing.T) {
 
 func TestAddHandler_WrapWithDirectoryFalse(t *testing.T) {
 	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
-		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory=false", "test", "test.png", 1024)
+		err := addFile(server.URL+proxy.AddEndpoint+"?wrap-with-directory=false", "test", 1024, "test.png")
 		require.NoError(t, err)
 
 		// Check that the DB contains the unwrapped file
@@ -237,6 +247,7 @@ func TestAddHandler_WrapWithDirectoryFalse(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, contents, 1)
 		assert.Equal(t, "test", contents[0].User)
+		assert.Equal(t, mock.Hash("test.png"), contents[0].Hash)
 		assert.Equal(t, "test.png", contents[0].Name)
 		assert.Equal(t, int64(1024), contents[0].Size)
 		assert.WithinDuration(t, time.Now(), contents[0].Created, 1*time.Minute)
@@ -281,7 +292,7 @@ func TestAddHandler_Dir_WrapWithDirectory(t *testing.T) {
 func TestPinRmHandle_Repin(t *testing.T) {
 	runTest(t, new(mock.IPFSAddHandler), func(t *testing.T, ctx *testcontext.Context, server *httptest.Server, db *db.DB) {
 		// Upload a file.
-		err := addFile(server.URL+proxy.AddEndpoint, "john", "first.jpg", 1024)
+		err := addFile(server.URL+proxy.AddEndpoint, "john", 1024, "first.jpg")
 		require.NoError(t, err)
 
 		// Record the original created timestamp
@@ -304,7 +315,7 @@ func TestPinRmHandle_Repin(t *testing.T) {
 		assert.WithinDuration(t, time.Now(), *contents[0].Removed, 1*time.Minute)
 
 		// Upload the same file.
-		err = addFile(server.URL+proxy.AddEndpoint, "john", "first.jpg", 1024)
+		err = addFile(server.URL+proxy.AddEndpoint, "john", 1024, "first.jpg")
 		require.NoError(t, err)
 
 		// Check that the content is no more marked as removed and the created time is still the original one.
@@ -316,8 +327,8 @@ func TestPinRmHandle_Repin(t *testing.T) {
 	})
 }
 
-func addFile(url, user, fileName string, fileSize int) error {
-	req, err := addRequest(url, user, fileName, fileSize)
+func addFile(url, user string, fileSize int, fileNames ...string) error {
+	req, err := addRequest(url, user, fileSize, fileNames...)
 	if err != nil {
 		return err
 	}
@@ -339,21 +350,23 @@ func addFile(url, user, fileName string, fileSize int) error {
 	return nil
 }
 
-func addRequest(url, user, fileName string, fileSize int) (*http.Request, error) {
+func addRequest(url, user string, fileSize int, fileNames ...string) (*http.Request, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
 	err := func() error {
 		defer writer.Close()
 
-		fw, err := writer.CreateFormFile("file", fileName)
-		if err != nil {
-			return err
-		}
+		for _, fileName := range fileNames {
+			fw, err := writer.CreateFormFile("file", fileName)
+			if err != nil {
+				return err
+			}
 
-		_, err = fw.Write(testrand.BytesInt(fileSize))
-		if err != nil {
-			return err
+			_, err = fw.Write(testrand.BytesInt(fileSize))
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
