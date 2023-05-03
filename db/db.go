@@ -10,8 +10,8 @@ import (
 	"github.com/zeebo/errs"
 	"go.uber.org/zap"
 
-	"storj.io/private/dbutil" // registers cockroach as a tagsql driver.
-	"storj.io/private/dbutil/cockroachutil"
+	"storj.io/private/dbutil"
+	"storj.io/private/dbutil/cockroachutil" // registers cockroach as a tagsql driver.
 	"storj.io/private/dbutil/pgutil"
 	"storj.io/private/migrate"
 	"storj.io/private/tagsql"
