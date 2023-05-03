@@ -120,7 +120,6 @@ func (db *DB) Migration() *migrate.Migration {
 				Version:     1,
 				Action: migrate.SQL{
 					`ALTER TABLE content DROP CONSTRAINT IF EXISTS content_pkey`,
-					`ALTER TABLE content DROP CONSTRAINT IF EXISTS "primary"`,
 					`ALTER TABLE content ADD PRIMARY KEY (username, hash)`,
 				},
 			},

@@ -29,7 +29,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Start CockroachDB
-      run: docker run --rm -d -p 26257:26257 cockroachdb/cockroach:latest-v21.2 start-single-node --insecure
+      run: docker run --rm -d -p 26257:26257 cockroachdb/cockroach:latest-v22.2 start-single-node --insecure
 
     - name: Set up Go
       uses: actions/setup-go@v2

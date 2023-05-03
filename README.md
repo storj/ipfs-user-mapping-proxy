@@ -1,8 +1,12 @@
 # IPFS User-Mapping Proxy
 
-This is a reverse proxy that runs in front of the IPFS node's HTTP API and intercepts the requests to the `/api/v0/add` endpoint.
+This is a reverse proxy that runs in front of the IPFS node's HTTP API and intercepts the requests to the following endpoints:
+- /api/v0/add
+- /api/v0/dag/import
+- /api/v0/pin/ls
+- /api/v0/pin/rm
 
-The proxy would detect the authenticated user name and will map it to the IPFS hash of the uploaded file. The mapping is stored in a local database.
+The proxy would detect the authenticated user name and will map it to the IPFS hash of the uploaded file. The mapping is stored in a local database. Respectively, listing and removing of pinned files is scoped to the authenticated user.
 
 ## Usage
 
