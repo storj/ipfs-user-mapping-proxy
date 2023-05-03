@@ -147,10 +147,14 @@ func (p *Proxy) handleDAGImport(ctx context.Context, w http.ResponseWriter, r *h
 		}
 
 		if msg.Stats != nil {
+			// It is not ideal to set the total bytes count to each of the
+			// imported CARs (in the case of multiple CARs in a single request),
+			// but we have no better way to keep track of the uploaded size.
+			size := msg.Stats.BlockBytesCount
+
 			for _, cid := range cids {
 				hash := cid
 				name := cid + " (dag import)"
-				size := msg.Stats.BlockBytesCount
 				err = p.db.Add(ctx, db.Content{
 					User: user,
 					Hash: hash,
