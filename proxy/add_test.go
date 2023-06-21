@@ -12,13 +12,14 @@ import (
 	"net/url"
 	"os"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"storj.io/common/testcontext"
 	"storj.io/common/testrand"
@@ -463,7 +464,8 @@ func sortByCreated(contents []db.Content) {
 func runTest(t *testing.T, mockHandler mock.ResettableHandler, f func(*testing.T, *testcontext.Context, *httptest.Server, *db.DB)) {
 	for _, impl := range []dbutil.Implementation{dbutil.Postgres, dbutil.Cockroach} {
 		impl := impl
-		t.Run(strings.Title(impl.String()), func(t *testing.T) {
+		name := cases.Title(language.English).String(impl.String())
+		t.Run(name, func(t *testing.T) {
 			ctx := testcontext.New(t)
 
 			if mockHandler == nil {
